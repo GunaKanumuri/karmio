@@ -1,0 +1,96 @@
+﻿  Γû▓ Next.js 14.2.35
+  - Environments: .env
+
+   Creating an optimized production build ...
+ Γ£ô Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/43) ...
+Auth GET error: n [Error]: Dynamic server usage: Route /api/auth couldn't be rendered statically because it used `cookies`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at l (C:\Users\veges\Downloads\karmio\.next\server\chunks\9276.js:1:37208)
+    at f (C:\Users\veges\Downloads\karmio\.next\server\chunks\9702.js:5:9224)
+    at r (C:\Users\veges\Downloads\karmio\.next\server\app\api\auth\login\route.js:1:3271)
+    at c (C:\Users\veges\Downloads\karmio\.next\server\app\api\auth\route.js:1:822)
+    at C:\Users\veges\Downloads\karmio\node_modules\next\dist\compiled\next-server\app-route.runtime.prod.js:6:38417
+    at C:\Users\veges\Downloads\karmio\node_modules\next\dist\server\lib\trace\tracer.js:140:36
+    at NoopContextManager.with (C:\Users\veges\Downloads\karmio\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:7062)
+    at ContextAPI.with (C:\Users\veges\Downloads\karmio\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:518)
+    at NoopTracer.startActiveSpan (C:\Users\veges\Downloads\karmio\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:18093)
+    at ProxyTracer.startActiveSpan (C:\Users\veges\Downloads\karmio\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:18854) {
+  description: "Route /api/auth couldn't be rendered statically because it used `cookies`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+   Generating static pages (10/43) 
+Admin API error: n [Error]: Dynamic server usage: Route /api/admin couldn't be rendered statically because it used `cookies`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at l (C:\Users\veges\Downloads\karmio\.next\server\chunks\9276.js:1:37208)
+    at f (C:\Users\veges\Downloads\karmio\.next\server\chunks\9702.js:5:9224)
+    at o (C:\Users\veges\Downloads\karmio\.next\server\app\api\admin\route.js:1:4198)
+    at l (C:\Users\veges\Downloads\karmio\.next\server\app\api\admin\route.js:1:829)
+    at d (C:\Users\veges\Downloads\karmio\.next\server\app\api\admin\route.js:1:1334)
+    at C:\Users\veges\Downloads\karmio\node_modules\next\dist\compiled\next-server\app-route.runtime.prod.js:6:38417
+    at C:\Users\veges\Downloads\karmio\node_modules\next\dist\server\lib\trace\tracer.js:140:36
+    at NoopContextManager.with (C:\Users\veges\Downloads\karmio\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:7062)
+    at ContextAPI.with (C:\Users\veges\Downloads\karmio\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:518)
+    at NoopTracer.startActiveSpan (C:\Users\veges\Downloads\karmio\node_modules\next\dist\compiled\@opentelemetry\api\index.js:1:18093) {
+  description: "Route /api/admin couldn't be rendered statically because it used `cookies`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+   Generating static pages (21/43) 
+   Generating static pages (32/43) 
+ Γ£ô Generating static pages (43/43)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+Γöî Γùï /                                    175 B          96.2 kB
+Γö£ Γùï /_not-found                          872 B          88.2 kB
+Γö£ ╞Æ /api/admin                           0 B                0 B
+Γö£ ╞Æ /api/ai                              0 B                0 B
+Γö£ ╞Æ /api/applications                    0 B                0 B
+Γö£ ╞Æ /api/auth                            0 B                0 B
+Γö£ ╞Æ /api/auth/login                      0 B                0 B
+Γö£ ╞Æ /api/auth/signup                     0 B                0 B
+Γö£ ╞Æ /api/jobs                            0 B                0 B
+Γö£ ╞Æ /api/jobs/fetch                      0 B                0 B
+Γö£ ╞Æ /api/jobs/seed                       0 B                0 B
+Γö£ ╞Æ /api/network                         0 B                0 B
+Γö£ ╞Æ /api/payments                        0 B                0 B
+Γö£ ╞Æ /api/profile                         0 B                0 B
+Γö£ ╞Æ /api/profile/upload-resume           0 B                0 B
+Γö£ ╞Æ /api/resumes                         0 B                0 B
+Γö£ ╞Æ /auth-pages/callback                 0 B                0 B
+Γö£ Γùï /auth-pages/login                    3.84 kB         159 kB
+Γö£ Γùï /auth-pages/signup                   4.37 kB         159 kB
+Γö£ Γùï /auth-pages/verify                   1.34 kB         147 kB
+Γö£ Γùï /dashboard/analytics                 2.77 kB         172 kB
+Γö£ Γùï /dashboard/home                      3.09 kB         178 kB
+Γö£ Γùï /dashboard/jobs/applied              2.94 kB         172 kB
+Γö£ Γùï /dashboard/jobs/feed                 2.09 kB         177 kB
+Γö£ Γùï /dashboard/jobs/pipeline             2.37 kB         171 kB
+Γö£ Γùï /dashboard/jobs/saved                2.64 kB         172 kB
+Γö£ Γùï /dashboard/network/contacts          3.81 kB         173 kB
+Γö£ Γùï /dashboard/network/follow-ups        2.66 kB         172 kB
+Γö£ Γùï /dashboard/network/messages          2.11 kB         171 kB
+Γö£ Γùï /dashboard/prep/behavioral           2.23 kB         171 kB
+Γö£ Γùï /dashboard/prep/hr                   2.88 kB         172 kB
+Γö£ Γùï /dashboard/prep/offers               2.46 kB         171 kB
+Γö£ Γùï /dashboard/prep/technical            2.36 kB         171 kB
+Γö£ Γùï /dashboard/resumes/profile           7.29 kB         176 kB
+Γö£ Γùï /dashboard/resumes/tailored          2.44 kB         171 kB
+Γö£ Γùï /dashboard/resumes/vault             2.53 kB         171 kB
+Γö£ Γùï /dashboard/settings                  2.65 kB         172 kB
+Γö£ Γùï /dashboard/subscription              2.16 kB         171 kB
+Γö£ Γùï /onboarding/assessment               11.2 kB        98.5 kB
+Γö£ Γùï /onboarding/location                 2.89 kB         158 kB
+Γöö Γùï /onboarding/profile-setup            5.98 kB         161 kB
++ First Load JS shared by all            87.3 kB
+  Γö£ chunks/117-16cf3c24abb494cf.js       31.7 kB
+  Γö£ chunks/fd9d1056-4617bd0e5cab27a5.js  53.6 kB
+  Γöö other shared chunks (total)          1.95 kB
+
+
+╞Æ Middleware                             78.8 kB
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+
