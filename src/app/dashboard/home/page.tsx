@@ -1,253 +1,272 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
-import { MetricCard } from '@/components/ui/Card';
-import { DailyBriefing } from '@/components/dashboard/DailyBriefing';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { JobCard } from '@/components/jobs/JobCard';
 import { useAuth } from '@/hooks/useAuth';
 import { IJobCardData } from '@/types';
-import { Skeleton } from '@/components/shared/Helpers';
 
 export default function DashboardHomePage() {
   const { user } = useAuth();
-  const [jobs, setJobs] = useState<IJobCardData[]>([]);
-  const [applications, setApplications] = useState<any[]>([]);
-  const [followUps, setFollowUps] = useState<any[]>([]);
+  const [recentJobs, setRecentJobs] = useState<IJobCardData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ saved: 0, applied: 0, interviews: 0 });
 
   useEffect(() => {
     if (!user) return;
 
-    const fetchDashboardData = async () => {
-      setLoading(true);
-      try {
-        const [jobsRes, appsRes] = await Promise.allSettled([
-          fetch('/api/jobs?limit=5&sort_by=match').then(r => r.json()),
-          fetch('/api/applications').then(r => r.json()),
-        ]);
+    // Fetch recent jobs
+    fetch('/api/jobs?limit=5&posted_within=7d')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success) setRecentJobs(json.data || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
 
-        if (jobsRes.status === 'fulfilled' && jobsRes.value.success) {
-          setJobs(jobsRes.value.data || []);
+    // Fetch application stats
+    fetch('/api/applications')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.data) {
+          const apps = json.data;
+          setStats({
+            saved: apps.filter((a: any) => a.status === 'saved').length,
+            applied: apps.filter((a: any) => ['applied', 'hr_screen', 'technical', 'behavioral', 'final'].includes(a.status)).length,
+            interviews: apps.filter((a: any) => ['hr_screen', 'technical', 'behavioral', 'final'].includes(a.status)).length,
+          });
         }
-        if (appsRes.status === 'fulfilled' && appsRes.value.success) {
-          setApplications(appsRes.value.data || []);
-        }
-      } catch (err) {
-        console.error('Dashboard data fetch error:', err);
-      }
-      setLoading(false);
-    };
-
-    fetchDashboardData();
+      })
+      .catch(() => {});
   }, [user]);
 
-  // Compute metrics from real data
-  const totalApplied = applications.filter(a => a.status !== 'saved').length;
-  const appliedThisWeek = applications.filter(a => {
-    if (!a.applied_at) return false;
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    return new Date(a.applied_at) > weekAgo;
-  }).length;
-  const callbacks = applications.filter(a => ['hr_screen', 'technical', 'behavioral', 'final', 'offer'].includes(a.status)).length;
-  const callbackRate = totalApplied > 0 ? Math.round((callbacks / totalApplied) * 100) : 0;
-  const avgMatch = jobs.length > 0 ? Math.round(jobs.reduce((sum, j) => sum + (j.match_score || 0), 0) / jobs.length) : 0;
-
-  // Build briefing from real data
-  const followUpsDue = applications.filter(a => {
-    if (a.status === 'applied' && a.applied_at) {
-      const daysSince = Math.floor((Date.now() - new Date(a.applied_at).getTime()) / 86400000);
-      return daysSince >= 7;
-    }
-    return false;
-  }).length;
-
-  const nextInterview = applications.find(a =>
-    ['hr_screen', 'technical', 'behavioral'].includes(a.status)
-  );
+  const greeting = getGreeting();
+  const firstName = user?.full_name?.split(' ')[0] || 'there';
 
   return (
     <AppShell>
-      {/* Daily briefing */}
-      <DailyBriefing data={{
-        new_matches: jobs.length,
-        follow_ups_due: followUpsDue,
-        next_interview: nextInterview ? {
-          company: nextInterview.job?.company_name || 'Unknown',
-          type: nextInterview.status === 'hr_screen' ? 'HR' : nextInterview.status === 'technical' ? 'Technical' : 'Behavioral',
-          day: 'this week',
-        } : undefined,
-        callback_change: totalApplied > 0 ? `${callbackRate}% overall` : undefined,
-      }} />
+      <div className="max-w-4xl">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold text-surface-900 dark:text-white mb-1">
+            {greeting}, {firstName}
+          </h1>
+          <p className="text-surface-500">Here is what is happening with your job search.</p>
+        </div>
 
-      {/* Metric cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4">
-              <Skeleton lines={3} />
-            </div>
-          ))
-        ) : (
-          <>
-            <MetricCard label="Total applied" value={totalApplied} change={`${appliedThisWeek} this week`} changeType="up" />
-            <MetricCard label="Job matches" value={jobs.length} change={user?.target_profiles?.length ? `Across ${(user as any).target_profiles.length} profile${(user as any).target_profiles.length > 1 ? 's' : ''}` : 'Set up a profile'} changeType="neutral" />
-            <MetricCard label="Callback rate" value={totalApplied > 0 ? `${callbackRate}%` : '--'} change={totalApplied > 0 ? 'From applications' : 'Apply to see rate'} changeType={callbackRate > 15 ? 'up' : 'neutral'} />
-            <MetricCard label="Avg match score" value={jobs.length > 0 ? `${avgMatch}%` : '--'} change={avgMatch >= 70 ? 'Strong matches' : avgMatch > 0 ? 'Check your profile' : 'No jobs yet'} changeType={avgMatch >= 70 ? 'up' : 'neutral'} />
-          </>
-        )}
-      </div>
+        {/* Stats cards */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <StatCard
+            label="Saved jobs"
+            value={stats.saved}
+            href="/dashboard/jobs/saved"
+            icon={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+              </svg>
+            }
+          />
+          <StatCard
+            label="Applied"
+            value={stats.applied}
+            href="/dashboard/jobs/applied"
+            icon={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                <path d="M22 4L12 14.01l-3-3" />
+              </svg>
+            }
+          />
+          <StatCard
+            label="Interviews"
+            value={stats.interviews}
+            href="/dashboard/jobs/pipeline"
+            highlight
+            icon={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+              </svg>
+            }
+          />
+        </div>
 
-      {/* Chart + Upcoming row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-        <div className="md:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4">
-          <p className="text-sm font-medium text-slate-900 dark:text-white mb-3">Weekly activity</p>
-          {loading ? (
-            <div className="h-36 flex items-center justify-center">
-              <Skeleton lines={2} />
-            </div>
-          ) : applications.length > 0 ? (
-            <WeeklyActivityChart applications={applications} />
-          ) : (
-            <div className="h-36 flex items-center justify-center text-sm text-slate-400">
-              <div className="text-center">
-                <p>No activity yet</p>
-                <p className="text-xs mt-1">Start applying to jobs to see your weekly chart</p>
+        {/* Quick actions */}
+        <div className="grid md:grid-cols-2 gap-4 mb-8">
+          <Link
+            href="/dashboard/jobs/feed"
+            className="p-6 rounded-2xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 hover:border-karmio-300 dark:hover:border-karmio-700 transition-all group"
+            data-testid="action-browse-jobs"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-karmio-50 dark:bg-karmio-900/30 flex items-center justify-center text-karmio-500">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.35-4.35" />
+                </svg>
               </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-surface-300 group-hover:text-karmio-500 group-hover:translate-x-1 transition-all">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
             </div>
-          )}
-        </div>
+            <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-1">Browse jobs</h3>
+            <p className="text-sm text-surface-500">Find your next opportunity from verified listings</p>
+          </Link>
 
-        {/* Upcoming */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4">
-          <p className="text-sm font-medium text-slate-900 dark:text-white mb-3">Upcoming</p>
-          {loading ? (
-            <Skeleton lines={4} />
-          ) : followUpsDue > 0 || nextInterview ? (
-            <div className="space-y-0">
-              {followUpsDue > 0 && (
-                <div className="py-2.5 border-b border-slate-100 dark:border-slate-800">
-                  <p className="text-xs font-medium text-amber-600 dark:text-amber-400">Today</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{followUpsDue} follow-up{followUpsDue > 1 ? 's' : ''} due</p>
-                </div>
-              )}
-              {nextInterview && (
-                <div className="py-2.5 border-b border-slate-100 dark:border-slate-800">
-                  <p className="text-xs font-medium text-slate-700 dark:text-slate-300">This week</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{nextInterview.job?.company_name} — {nextInterview.status.replace('_', ' ')} round</p>
-                </div>
-              )}
+          <Link
+            href="/dashboard/resumes/profile"
+            className="p-6 rounded-2xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 hover:border-karmio-300 dark:hover:border-karmio-700 transition-all group"
+            data-testid="action-build-resume"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-500">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                  <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+                </svg>
+              </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-surface-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
             </div>
-          ) : (
-            <div className="py-6 text-center text-xs text-slate-400">
-              <p>Nothing upcoming</p>
-              <p className="mt-1">Apply to jobs to see follow-ups and interviews here</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Job matches */}
-      <div className="mt-6">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-white flex items-center gap-2">
-            {jobs.length > 0 ? "Today's matches" : 'Job matches'}
-            {jobs.length > 0 && <Badge variant="info">{jobs.length} jobs</Badge>}
-          </h2>
-          <Link href="/dashboard/jobs/feed">
-            <Button size="sm" variant="ghost">View all jobs</Button>
+            <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-1">Build your resume</h3>
+            <p className="text-sm text-surface-500">Create tailored resumes for each application</p>
           </Link>
         </div>
 
-        {loading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4">
-                <Skeleton lines={3} />
+        {/* Recent jobs */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-surface-900 dark:text-white">Recent opportunities</h2>
+            <Link href="/dashboard/jobs/feed" className="text-sm text-karmio-500 hover:text-karmio-600 font-medium">
+              View all
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="p-5 rounded-2xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 animate-pulse">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-surface-100 dark:bg-surface-800" />
+                    <div className="flex-1">
+                      <div className="h-4 w-48 bg-surface-100 dark:bg-surface-800 rounded mb-2" />
+                      <div className="h-3 w-32 bg-surface-100 dark:bg-surface-800 rounded" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : recentJobs.length > 0 ? (
+            <div className="space-y-3">
+              {recentJobs.map(job => (
+                <JobPreviewCard key={job.id} job={job} />
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 rounded-2xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 text-center">
+              <div className="w-12 h-12 rounded-full bg-surface-100 dark:bg-surface-800 flex items-center justify-center mx-auto mb-4">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-surface-400">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.35-4.35" />
+                </svg>
               </div>
-            ))}
-          </div>
-        ) : jobs.length > 0 ? (
-          <div className="space-y-3">
-            {jobs.slice(0, 5).map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                onStatusChange={() => {
-                  // Refresh applications data when user applies/saves
-                  fetch('/api/applications').then(r => r.json()).then(json => {
-                    if (json.success) setApplications(json.data || []);
-                  });
-                }}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/50 rounded-xl p-8 text-center">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-slate-300">
-              <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-            </svg>
-            <p className="text-sm text-slate-500">No job matches yet</p>
-            <p className="text-xs text-slate-400 mt-1">
-              {!(user as any)?.target_profiles?.length
-                ? 'Complete your profile to start seeing matched jobs.'
-                : 'New jobs are fetched regularly. Check back soon!'}
-            </p>
-            {!(user as any)?.target_profiles?.length && (
-              <Link href="/dashboard/resumes/profile" className="inline-block mt-3">
-                <Button variant="primary" size="sm">Complete profile</Button>
+              <p className="text-surface-600 dark:text-surface-400 mb-4">No jobs loaded yet</p>
+              <Link href="/dashboard/jobs/feed" className="btn btn-primary btn-sm">
+                Browse jobs
               </Link>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </AppShell>
   );
 }
 
-function WeeklyActivityChart({ applications }: { applications: any[] }) {
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const now = new Date();
-  const weekData = days.map((label, i) => {
-    const dayDate = new Date(now);
-    const currentDay = now.getDay();
-    const diff = (currentDay === 0 ? -6 : 1 - currentDay) + i;
-    dayDate.setDate(now.getDate() + diff);
-    dayDate.setHours(0, 0, 0, 0);
+function StatCard({ label, value, href, icon, highlight }: {
+  label: string;
+  value: number;
+  href: string;
+  icon: React.ReactNode;
+  highlight?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`p-5 rounded-2xl border transition-all ${
+        highlight
+          ? 'border-karmio-200 dark:border-karmio-800 bg-karmio-50 dark:bg-karmio-900/20 hover:border-karmio-300'
+          : 'border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 hover:border-surface-300 dark:hover:border-surface-600'
+      }`}
+    >
+      <div className={`mb-3 ${highlight ? 'text-karmio-500' : 'text-surface-400'}`}>
+        {icon}
+      </div>
+      <div className="text-2xl font-semibold text-surface-900 dark:text-white">{value}</div>
+      <div className="text-sm text-surface-500">{label}</div>
+    </Link>
+  );
+}
 
-    const nextDay = new Date(dayDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-
-    const applied = applications.filter(a => {
-      if (!a.applied_at) return false;
-      const d = new Date(a.applied_at);
-      return d >= dayDate && d < nextDay;
-    }).length;
-
-    return { label, applied };
-  });
-
-  const maxVal = Math.max(1, ...weekData.map(d => d.applied));
+function JobPreviewCard({ job }: { job: IJobCardData }) {
+  const companyInitial = job.company_name.charAt(0).toUpperCase();
+  const logoUrl = guessLogoUrl(job.company_name);
 
   return (
-    <>
-      <div className="h-36 flex items-end gap-1 px-2">
-        {weekData.map((d) => (
-          <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
-            <div className="w-full flex gap-0.5 items-end justify-center" style={{ height: '100px' }}>
-              <div className="w-5 bg-emerald-300 dark:bg-emerald-700 rounded-t transition-all" style={{ height: `${Math.max(4, (d.applied / maxVal) * 100)}%` }} />
-            </div>
-            <span className="text-[10px] text-slate-400">{d.label}</span>
+    <Link
+      href="/dashboard/jobs/feed"
+      className="block p-5 rounded-2xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 hover:border-karmio-300 dark:hover:border-karmio-700 transition-all"
+    >
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-xl border border-surface-200 dark:border-surface-700 flex items-center justify-center bg-white dark:bg-surface-800 overflow-hidden flex-shrink-0">
+          {logoUrl ? (
+            <img src={logoUrl} alt="" className="w-8 h-8 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          ) : (
+            <span className="text-lg font-medium text-surface-400">{companyInitial}</span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-surface-900 dark:text-white truncate">{job.title}</h3>
+          <p className="text-sm text-surface-500 truncate">
+            {job.company_name} · {job.location}
+            {job.remote_type !== 'onsite' && ` · ${job.remote_type}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {job.salary_min && job.salary_max && (
+            <span className="text-sm text-surface-500">
+              ${Math.round(job.salary_min / 1000)}k+
+            </span>
+          )}
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${
+            job.match_score >= 80 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
+            job.match_score >= 60 ? 'bg-karmio-50 text-karmio-600 dark:bg-karmio-900/30 dark:text-karmio-400' :
+            'bg-surface-100 text-surface-500 dark:bg-surface-800'
+          }`}>
+            {job.match_score || 0}
           </div>
-        ))}
+        </div>
       </div>
-      <div className="flex gap-4 mt-3 text-[11px] text-slate-400">
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400" />Applied</span>
-      </div>
-    </>
+    </Link>
   );
+}
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function guessLogoUrl(companyName: string): string | null {
+  const overrides: Record<string, string> = {
+    'stripe': 'stripe.com', 'google': 'google.com', 'meta': 'meta.com',
+    'amazon': 'amazon.com', 'microsoft': 'microsoft.com', 'apple': 'apple.com',
+    'netflix': 'netflix.com', 'spotify': 'spotify.com', 'airbnb': 'airbnb.com',
+    'openai': 'openai.com',
+  };
+  const lower = companyName.toLowerCase();
+  const domain = overrides[lower] || `${lower.replace(/[^a-z0-9]/g, '')}.com`;
+  return `https://logo.clearbit.com/${domain}`;
 }

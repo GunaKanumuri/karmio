@@ -2,114 +2,135 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/Button';
+import Link from 'next/link';
+
+const COUNTRIES = [
+  { code: 'US', name: 'United States', flag: '🇺🇸', desc: 'H1B sponsorship filters, USD salaries' },
+  { code: 'IN', name: 'India', flag: '🇮🇳', desc: 'INR salaries, local job boards' },
+];
 
 export default function LocationPage() {
-  const [country, setCountry] = useState<'US' | 'IN' | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const handleContinue = async () => {
-    if (!country) return;
-    setLoading(true);
+    if (!selected) return;
+    setSaving(true);
     setError('');
 
     try {
       const res = await fetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ country }),
+        body: JSON.stringify({ country: selected }),
       });
 
-      if (res.status === 401) {
-        setError('Session expired. Redirecting...');
-        setTimeout(() => router.push('/auth-pages/login'), 1500);
-        setLoading(false);
-        return;
-      }
-
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        setError(json.error?.message || 'Could not save location.');
-        setLoading(false);
+      const json = await res.json();
+      if (!json.success) {
+        setError(json.error?.message || 'Could not save. Please try again.');
+        setSaving(false);
         return;
       }
 
       router.push('/onboarding/assessment');
     } catch {
       setError('Connection error. Please try again.');
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <div className="w-8 h-8 border-2 border-karmio-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  const countries = [
-    { code: 'US' as const, flag: '🇺🇸', name: 'United States', desc: 'Greenhouse, Lever, USAJobs, H1B visa support' },
-    { code: 'IN' as const, flag: '🇮🇳', name: 'India', desc: 'Naukri, Freshteam, Instahyre, INR pricing' },
-  ];
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4">
-      <div className="w-full max-w-md animate-fade-in-up">
-        {/* Progress */}
-        <div className="flex items-center gap-2 mb-8 justify-center">
-          {['Location', 'Assessment', 'Profile'].map((s, i) => (
-            <div key={s} className="flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${i === 0 ? 'bg-karmio-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400'
-                }`}>{i + 1}</div>
-              <span className={`text-xs font-medium ${i === 0 ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400'}`}>{s}</span>
-              {i < 2 && <div className="w-8 h-px bg-zinc-200 dark:bg-zinc-800" />}
+    <div className="min-h-screen bg-white dark:bg-surface-950 flex flex-col">
+      {/* Progress bar */}
+      <div className="h-1 bg-surface-100 dark:bg-surface-800">
+        <div className="h-full bg-karmio-500 transition-all duration-500" style={{ width: '33%' }} />
+      </div>
+
+      {/* Header */}
+      <header className="px-6 py-4 flex items-center justify-between border-b border-surface-200 dark:border-surface-800">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-karmio-500 flex items-center justify-center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+          </div>
+          <span className="font-semibold text-surface-900 dark:text-white">Karmio</span>
+        </Link>
+        <div className="text-sm text-surface-500">Step 1 of 3</div>
+      </header>
+
+      {/* Content */}
+      <main className="flex-1 flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-lg animate-slide-up">
+          <div className="text-center mb-10">
+            <h1 className="text-3xl font-semibold text-surface-900 dark:text-white mb-3">Where are you looking for work?</h1>
+            <p className="text-surface-600 dark:text-surface-400">
+              This helps us show relevant jobs, salary ranges, and visa information.
+            </p>
+          </div>
+
+          <div className="space-y-4 mb-8">
+            {COUNTRIES.map((country) => (
+              <button
+                key={country.code}
+                onClick={() => setSelected(country.code)}
+                className={`w-full p-5 rounded-2xl border-2 text-left transition-all ${
+                  selected === country.code
+                    ? 'border-karmio-500 bg-karmio-50 dark:bg-karmio-900/20'
+                    : 'border-surface-200 dark:border-surface-700 hover:border-surface-300 dark:hover:border-surface-600 bg-white dark:bg-surface-900'
+                }`}
+                data-testid={`country-${country.code}`}
+              >
+                <div className="flex items-center gap-4">
+                  <span className="text-4xl">{country.flag}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-medium text-surface-900 dark:text-white">{country.name}</span>
+                      {selected === country.code && (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-karmio-500">
+                          <circle cx="12" cy="12" r="10" fill="currentColor" />
+                          <path d="M8 12l3 3 5-6" stroke="white" strokeWidth="2" />
+                        </svg>
+                      )}
+                    </div>
+                    <p className="text-sm text-surface-500 mt-0.5">{country.desc}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {error && (
+            <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 mb-6 animate-fade-in">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
             </div>
-          ))}
-        </div>
-
-        <div className="text-center mb-6">
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Where are you located?</h1>
-          {user?.full_name && (
-            <p className="text-sm text-zinc-500 mt-1">Welcome, {user.full_name.split(' ')[0]}!</p>
           )}
-        </div>
 
-        <div className="card p-4 mb-5">
-          <p className="text-xs text-zinc-500 leading-relaxed">
-            <strong className="text-zinc-700 dark:text-zinc-300">Why:</strong> This determines your job sources, salary formats, and pricing.
+          <button
+            onClick={handleContinue}
+            disabled={!selected || saving}
+            className="btn btn-primary btn-lg w-full disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="location-continue"
+          >
+            {saving ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Continue'
+            )}
+          </button>
+
+          <p className="text-center text-sm text-surface-500 mt-6">
+            You can change this later in settings
           </p>
         </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          {countries.map(loc => (
-            <button
-              key={loc.code}
-              onClick={() => setCountry(loc.code)}
-              className={`p-5 rounded-xl border-2 text-left transition-all ${country === loc.code
-                  ? 'border-karmio-500 bg-karmio-50 dark:bg-karmio-900/20'
-                  : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300'
-                }`}
-            >
-              <span className="text-3xl block mb-2">{loc.flag}</span>
-              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{loc.name}</p>
-              <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">{loc.desc}</p>
-            </button>
-          ))}
-        </div>
-
-        <Button variant="primary" fullWidth onClick={handleContinue} loading={loading} disabled={!country} size="lg">
-          Continue
-        </Button>
-
-        {error && <p className="text-sm text-red-500 text-center mt-3">{error}</p>}
-        <p className="text-xs text-zinc-400 text-center mt-4">You can change this later in Settings.</p>
-      </div>
+      </main>
     </div>
   );
 }

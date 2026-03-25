@@ -41,15 +41,30 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Logged-in users hitting login/signup — send to dashboard
-  // NOTE: Onboarding check happens in useAuth hook, NOT here (zero DB queries in middleware)
+  // Logged-in users hitting login/signup — check onboarding and redirect appropriately
   if (user && !authError && (pathname === '/auth-pages/login' || pathname === '/auth-pages/signup')) {
-    return NextResponse.redirect(new URL('/dashboard/home', request.url));
+    // Fetch onboarding status to determine correct redirect
+    const { data: profile } = await supabase
+      .from('users')
+      .select('onboarding_complete')
+      .eq('id', user.id)
+      .single();
+
+    const destination = profile?.onboarding_complete 
+      ? '/dashboard/home' 
+      : '/onboarding/location';
+    
+    return NextResponse.redirect(new URL(destination, request.url));
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/onboarding/:path*', '/auth-pages/login', '/auth-pages/signup'],
+  matcher: [
+    '/dashboard/:path*', 
+    '/onboarding/:path*', 
+    '/auth-pages/login', 
+    '/auth-pages/signup'
+  ],
 };

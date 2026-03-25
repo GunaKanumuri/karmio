@@ -56,7 +56,7 @@ export function CompanyIntel({ companyName, careerUrl, sponsorshipHistory, openR
       <div className="mt-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
         <p className="text-xs text-slate-500 leading-relaxed">
           Company intel is gathered from public sources including DOL H1B filings, company career pages, and ATS data.
-          Data may not be 100% current — verify on the company website before applying.
+          Data may not be 100% current, verify on the company website before applying.
         </p>
       </div>
     </Card>

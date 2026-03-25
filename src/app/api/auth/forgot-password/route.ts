@@ -2,40 +2,61 @@ import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { z } from 'zod';
 
-const schema = z.object({
-    email: z.string().email('Please enter a valid email address.'),
+const forgotPasswordSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
 });
 
 export async function POST(request: Request) {
-    try {
-        const body = await request.json();
-        const parsed = schema.safeParse(body);
+  try {
+    const body = await request.json();
 
-        if (!parsed.success) {
-            return NextResponse.json({
-                success: false,
-                error: { code: 'VALIDATION_ERROR', message: parsed.error.errors[0]?.message || 'Invalid input.' },
-            }, { status: 400 });
-        }
-
-        const { email } = parsed.data;
-        const supabase = await createServerSupabase();
-
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${new URL(request.url).origin}/auth-pages/callback`,
-        });
-
-        if (error) {
-            console.error('Password reset error:', error.message);
-            // Don't reveal if user exists — always return success
-        }
-
-        return NextResponse.json({ success: true });
-    } catch (err) {
-        console.error('Forgot password error:', err);
-        return NextResponse.json({
-            success: false,
-            error: { code: 'INTERNAL_ERROR', message: 'Something went wrong.' },
-        }, { status: 500 });
+    // Validate input
+    const result = forgotPasswordSchema.safeParse(body);
+    if (!result.success) {
+      return NextResponse.json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: result.error.errors[0].message,
+          retryable: false,
+        },
+      }, { status: 400 });
     }
+
+    const { email } = result.data;
+    const supabase = await createServerSupabase();
+
+    // Send password reset email
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${new URL(request.url).origin}/auth-pages/callback?type=recovery`,
+    });
+
+    if (error) {
+      console.error('Password reset error:', error);
+      // Don't reveal whether email exists for security
+      // Always return success to prevent email enumeration
+    }
+
+    // Always return success to prevent email enumeration attacks
+    return NextResponse.json({
+      success: true,
+      data: { message: 'If an account exists, a reset link has been sent.' },
+    }, {
+      headers: {
+        'X-RateLimit-Limit': '5',
+        'X-RateLimit-Remaining': '4',
+        'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 900),
+      },
+    });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    return NextResponse.json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Something went wrong. Please try again.',
+        retryable: true,
+      },
+    }, { status: 500 });
+  }
 }
