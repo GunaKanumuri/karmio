@@ -1,126 +1,159 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
+import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { Input, Textarea } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/shared/Helpers';
+import { ContactCard } from '@/components/network/ContactCard';
+import { MessageCrafter } from '@/components/network/MessageCrafter';
 import { useAuth } from '@/hooks/useAuth';
-import { Plus, Users, Linkedin, Mail } from 'lucide-react';
+import { useContacts, useAddContact } from '@/hooks/useNetwork';
+import { useApplications } from '@/hooks/useApplications';
+import { Users, Plus, Search, Filter } from 'lucide-react';
 
 export default function ContactsPage() {
   const { user } = useAuth();
-  const [contacts, setContacts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: '', company: '', title: '', email: '', linkedin_url: '', notes: '' });
-  const [saving, setSaving] = useState(false);
+  const { data: contacts = [], isLoading } = useContacts();
+  const { data: applications = [] } = useApplications();
+  const addContact = useAddContact();
+
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [messageTarget, setMessageTarget] = useState<any>(null);
+  const [addForm, setAddForm] = useState({ name: '', title: '', linkedin_url: '', email: '', notes: '', application_id: '' });
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!user) return;
-    fetchContacts();
-  }, [user]);
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
-  const fetchContacts = async () => {
-    try {
-      const res = await fetch('/api/network?type=contacts');
-      const json = await res.json();
-      if (json.success) setContacts(json.data || []);
-    } catch {}
-    setLoading(false);
-  };
+  const filtered = contacts.filter((c: any) => {
+    if (search) {
+      const q = search.toLowerCase();
+      if (!c.name?.toLowerCase().includes(q) && !c.title?.toLowerCase().includes(q)) return false;
+    }
+    if (statusFilter !== 'all' && c.connection_status !== statusFilter) return false;
+    return true;
+  });
 
-  const addContact = async () => {
-    if (!form.name) return;
+  const totalContacts = contacts.length;
+  const connected = contacts.filter((c: any) => c.connection_status === 'connected').length;
+  const responded = contacts.filter((c: any) => c.connection_status === 'responded').length;
+  const pending = contacts.filter((c: any) => c.connection_status === 'pending').length;
+
+  const handleAddContact = async () => {
+    if (!addForm.name.trim()) return;
     setSaving(true);
     try {
-      await fetch('/api/network', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'contact', ...form }),
+      await addContact.mutateAsync({
+        name: addForm.name, title: addForm.title,
+        linkedin_url: addForm.linkedin_url || null, email: addForm.email || null,
+        notes: addForm.notes || null, application_id: addForm.application_id || null,
       });
-      await fetchContacts();
-      setShowAdd(false);
-      setForm({ name: '', company: '', title: '', email: '', linkedin_url: '', notes: '' });
-    } catch {}
+      showToast('Contact added');
+      setShowAddModal(false);
+      setAddForm({ name: '', title: '', linkedin_url: '', email: '', notes: '', application_id: '' });
+    } catch { showToast('Failed to add contact'); }
     setSaving(false);
   };
-
-  const filtered = contacts.filter(c =>
-    !search || c.name?.toLowerCase().includes(search.toLowerCase()) || c.company?.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <AppShell>
       <div className="max-w-4xl">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-lg font-medium text-slate-900 dark:text-white">
-            Contacts <Badge variant="info">{contacts.length}</Badge>
+          <h1 className="text-lg font-medium text-slate-900 dark:text-white flex items-center gap-2">
+            <Users size={20} className="text-slate-400" /> Contacts <Badge variant="info">{totalContacts}</Badge>
           </h1>
-          <Button size="sm" onClick={() => setShowAdd(true)}><Plus size={14} className="mr-1" />Add contact</Button>
+          <Button variant="primary" size="sm" onClick={() => setShowAddModal(true)}><Plus size={14} /> Add contact</Button>
         </div>
 
-        <div className="mb-4">
-          <Input placeholder="Search contacts..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-
-        {loading ? (
-          <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4"><Skeleton lines={2} /></div>
-          ))}</div>
-        ) : filtered.length > 0 ? (
-          <div className="space-y-2">
-            {filtered.map(contact => (
-              <div key={contact.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-karmio-100 dark:bg-karmio-900 flex items-center justify-center text-xs font-medium text-karmio-700 dark:text-karmio-300 flex-shrink-0">
-                    {contact.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{contact.name}</p>
-                    <p className="text-xs text-slate-500">{contact.title ? `${contact.title} at ` : ''}{contact.company || 'No company'}</p>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  {contact.linkedin_url && (
-                    <a href={contact.linkedin_url.startsWith('http') ? contact.linkedin_url : `https://${contact.linkedin_url}`} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="ghost"><Linkedin size={14} /></Button>
-                    </a>
-                  )}
-                  {contact.email && (
-                    <a href={`mailto:${contact.email}`}>
-                      <Button size="sm" variant="ghost"><Mail size={14} /></Button>
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/50 rounded-xl p-12 text-center">
-            <Users size={32} className="mx-auto mb-3 text-slate-300" />
-            <p className="text-sm text-slate-500">No contacts yet</p>
-            <p className="text-xs text-slate-400 mt-1">Add contacts you meet during your job search to track networking efforts.</p>
-            <Button variant="primary" size="sm" className="mt-3" onClick={() => setShowAdd(true)}>Add your first contact</Button>
+        {totalContacts > 0 && (
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl px-4 py-3 text-center">
+              <p className="text-lg font-semibold text-emerald-700 dark:text-emerald-300">{connected}</p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400">Connected</p>
+            </div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl px-4 py-3 text-center">
+              <p className="text-lg font-semibold text-blue-700 dark:text-blue-300">{responded}</p>
+              <p className="text-xs text-blue-600 dark:text-blue-400">Responded</p>
+            </div>
+            <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl px-4 py-3 text-center">
+              <p className="text-lg font-semibold text-amber-700 dark:text-amber-300">{pending}</p>
+              <p className="text-xs text-amber-600 dark:text-amber-400">Pending</p>
+            </div>
           </div>
         )}
 
-        <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add contact">
-          <div className="space-y-4">
-            <Input label="Full name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
-            <Input label="Company" value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} />
-            <Input label="Title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-            <Input label="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-            <Input label="LinkedIn URL" value={form.linkedin_url} onChange={e => setForm({ ...form, linkedin_url: e.target.value })} />
+        <div className="flex gap-2 mb-4">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input type="text" placeholder="Search contacts..." value={search} onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-karmio-500/20 focus:border-karmio-400" />
           </div>
-          <div className="flex justify-end gap-2 mt-6">
-            <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
-            <Button variant="primary" loading={saving} onClick={addContact}>Add contact</Button>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300">
+            <option value="all">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="connected">Connected</option>
+            <option value="responded">Responded</option>
+            <option value="no_response">No response</option>
+          </select>
+        </div>
+
+        {isLoading ? (
+          <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Card key={i}><Skeleton lines={3} /></Card>)}</div>
+        ) : filtered.length > 0 ? (
+          <div className="space-y-3">
+            {filtered.map((contact: any) => (
+              <ContactCard key={contact.id} contact={contact} onMessage={() => setMessageTarget(contact)} />
+            ))}
+          </div>
+        ) : totalContacts > 0 ? (
+          <Card><div className="text-center py-8"><Filter size={24} className="mx-auto mb-2 text-slate-300" /><p className="text-sm text-slate-500">No contacts match your filters.</p></div></Card>
+        ) : (
+          <Card>
+            <div className="text-center py-12">
+              <Users size={32} className="mx-auto mb-3 text-slate-300" />
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">No contacts yet</p>
+              <p className="text-xs text-slate-400 mb-4">Add contacts from companies you&apos;re applying to. Karmio will help you craft outreach messages and track follow-ups.</p>
+              <Button variant="primary" size="sm" onClick={() => setShowAddModal(true)}><Plus size={14} /> Add your first contact</Button>
+            </div>
+          </Card>
+        )}
+
+        {messageTarget && (
+          <MessageCrafter contactName={messageTarget.name} contactTitle={messageTarget.title} companyName={messageTarget.company || ''} roleTitle="" open={!!messageTarget} onClose={() => setMessageTarget(null)} />
+        )}
+
+        <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="Add contact" size="md">
+          <div className="space-y-4">
+            <Input label="Name" placeholder="Jane Smith" value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} required />
+            <Input label="Title / Role" placeholder="Engineering Manager at Stripe" value={addForm.title} onChange={(e) => setAddForm({ ...addForm, title: e.target.value })} />
+            <Input label="LinkedIn URL" placeholder="https://linkedin.com/in/..." value={addForm.linkedin_url} onChange={(e) => setAddForm({ ...addForm, linkedin_url: e.target.value })} />
+            <Input label="Email" placeholder="jane@company.com" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} />
+            {applications.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1.5">Link to application</label>
+                <select value={addForm.application_id} onChange={(e) => setAddForm({ ...addForm, application_id: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300">
+                  <option value="">No application</option>
+                  {applications.map((a: any) => <option key={a.id} value={a.id}>{a.job?.company_name || 'Unknown'} — {a.job?.title || 'Unknown role'}</option>)}
+                </select>
+              </div>
+            )}
+            <Textarea label="Notes" placeholder="How you found them, mutual connections, etc." value={addForm.notes} onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })} rows={2} />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setShowAddModal(false)}>Cancel</Button>
+              <Button variant="primary" onClick={handleAddContact} loading={saving} disabled={!addForm.name.trim()}>Add contact</Button>
+            </div>
           </div>
         </Modal>
+
+        {toast && <div className="fixed bottom-6 right-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg z-50 animate-fade-in">{toast}</div>}
       </div>
     </AppShell>
   );

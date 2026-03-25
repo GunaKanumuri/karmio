@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   LayoutDashboard, Search, FileText, Users, BookOpen,
-  BarChart3, CreditCard, Settings, LogOut
+  BarChart3, CreditCard, Settings, LogOut, User
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
 
 const BOTTOM_ITEMS = [
   { href: '/dashboard/subscription', icon: CreditCard, label: 'Plan' },
+  { href: '/dashboard/resumes/profile', icon: User, label: 'Profile' },
   { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
 ];
 
@@ -33,7 +34,7 @@ export function Sidebar({ userInitials = 'U', onSignOut }: { userInitials?: stri
     <aside className="w-[72px] h-screen flex flex-col items-center py-5 gap-1 border-r border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-950 flex-shrink-0">
       {/* Logo */}
       <Link href="/dashboard/home" className="mb-6" data-testid="sidebar-logo">
-        <div className="w-10 h-10 rounded-xl bg-karmio-500 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-karmio-500 flex items-center justify-center shadow-sm shadow-karmio-500/20">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
             <path d="M12 2L2 7l10 5 10-5-10-5z" />
             <path d="M2 17l10 5 10-5" />
@@ -51,17 +52,20 @@ export function Sidebar({ userInitials = 'U', onSignOut }: { userInitials?: stri
 
       <div className="flex-1" />
 
-      {/* Bottom nav */}
+      {/* Bottom nav — Plan, Profile, Settings */}
       <nav className="flex flex-col gap-1">
         {BOTTOM_ITEMS.map((item) => (
-          <NavItem key={item.href} item={item} active={isActive(item.href)} />
+          <NavItem key={item.href + item.label} item={item} active={isActive(item.href) && item.label !== 'Profile'} />
         ))}
       </nav>
+
+      {/* Divider */}
+      <div className="w-8 h-px bg-slate-200 dark:bg-slate-700 my-1" />
 
       {/* Logout */}
       <button
         onClick={onSignOut}
-        className="group mt-2"
+        className="group"
         title="Sign out"
         data-testid="sidebar-logout"
       >
@@ -71,7 +75,7 @@ export function Sidebar({ userInitials = 'U', onSignOut }: { userInitials?: stri
       </button>
 
       {/* Avatar */}
-      <div className="mt-3 w-9 h-9 rounded-full bg-karmio-100 dark:bg-karmio-900/50 flex items-center justify-center text-xs font-medium text-karmio-700 dark:text-karmio-300">
+      <div className="mt-2 w-9 h-9 rounded-full bg-karmio-100 dark:bg-karmio-900/50 flex items-center justify-center text-xs font-semibold text-karmio-700 dark:text-karmio-300 ring-2 ring-karmio-200 dark:ring-karmio-800/50">
         {userInitials}
       </div>
     </aside>
@@ -84,7 +88,7 @@ function NavItem({ item, active }: { item: { href: string; icon: any; label: str
     <Link href={item.href} className="group relative" data-testid={`nav-${item.label.toLowerCase()}`}>
       <div className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${
         active
-          ? 'bg-karmio-50 dark:bg-karmio-900/30 text-karmio-600 dark:text-karmio-400'
+          ? 'bg-karmio-50 dark:bg-karmio-900/30 text-karmio-600 dark:text-karmio-400 shadow-sm'
           : 'text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 hover:text-surface-600 dark:hover:text-surface-300'
       }`}>
         <Icon size={18} strokeWidth={1.5} />
