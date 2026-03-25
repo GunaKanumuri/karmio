@@ -8,18 +8,8 @@ import { IUser } from '@/types';
 
 // ─── Fetch auth profile via API route ───
 async function fetchAuthProfile(): Promise<IUser | null> {
-  const supabase = createClient();
-
-  // Single server-validated auth check
-  const { data: { user }, error } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    // Try one refresh if token expired
-    const { data: refreshData } = await supabase.auth.refreshSession();
-    if (!refreshData?.user) return null;
-  }
-
-  // Fetch profile via API (never direct DB)
+  // Fetch profile via API (server validates auth via cookies — no client-side getUser needed)
+  // This avoids the race condition where client-side SDK hasn't initialized cookies yet
   const res = await fetch('/api/auth', {
     credentials: 'include',
     headers: { 'Cache-Control': 'no-cache' },
@@ -58,16 +48,12 @@ export function useAuth(requireAuth = true) {
     retry: 1,
   });
 
-  // Handle auth redirects
+  // Handle onboarding redirect only — auth redirects are handled by middleware
   useEffect(() => {
     if (loading || redirectedRef.current) return;
 
-    if (!user && requireAuth) {
-      redirectedRef.current = true;
-      router.push('/auth-pages/login');
-      return;
-    }
-
+    // Middleware handles the not-logged-in → login redirect,
+    // so we only handle onboarding here
     if (user && !user.onboarding_complete && requireAuth) {
       const pathname = window.location.pathname;
       if (!pathname.startsWith('/onboarding')) {

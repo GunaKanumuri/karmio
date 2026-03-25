@@ -22,6 +22,9 @@ export async function GET(request: Request) {
   try {
     const cookieStore = await cookies();
 
+    // Collect cookies that Supabase wants to set so we can attach them to the redirect
+    const cookiesToReturn: { name: string; value: string; options?: CookieOptions }[] = [];
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -34,6 +37,8 @@ export async function GET(request: Request) {
             cookiesToSet.forEach(({ name, value, options }) => {
               cookieStore.set(name, value, options as any);
             });
+            // Also stash them so we can set them on the redirect response
+            cookiesToReturn.push(...cookiesToSet);
           },
         },
       }
@@ -78,7 +83,6 @@ export async function GET(request: Request) {
 
       if (insertError) {
         console.error('[Auth Callback] Profile creation failed:', insertError);
-        // Continue anyway - profile will be created on next API call
       }
       profile = newProfile || { onboarding_complete: false };
     }
@@ -94,7 +98,13 @@ export async function GET(request: Request) {
       destination 
     });
 
-    return NextResponse.redirect(`${origin}${destination}`);
+    // Build redirect response and explicitly attach all session cookies
+    const redirectResponse = NextResponse.redirect(`${origin}${destination}`);
+    cookiesToReturn.forEach(({ name, value, options }) => {
+      redirectResponse.cookies.set(name, value, options as any);
+    });
+
+    return redirectResponse;
   } catch (err) {
     console.error('[Auth Callback] Unexpected error:', err);
     return NextResponse.redirect(`${origin}/auth-pages/login?error=callback_error`);

@@ -52,6 +52,10 @@ export const updateProfileSchema = z.object({
     target_titles: z.array(z.string().max(100)).optional(),
     priority_skills: z.array(z.string().max(50)).optional(),
     is_primary: z.boolean().optional(),
+    career_field: z.string().max(50).optional(),
+    career_stage: z.string().max(50).optional(),
+    job_types: z.array(z.string().max(30)).optional(),
+    company_types: z.array(z.string().max(30)).optional(),
   }).optional(),
   experiences: z.array(z.object({
     id: z.string().uuid().optional(),

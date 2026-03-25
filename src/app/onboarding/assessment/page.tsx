@@ -85,15 +85,18 @@ export default function AssessmentPage() {
 
     try {
       // Create target profile with assessment data
+      // API expects `target_profile` (singular object), not `target_profiles` (array)
       const profileData = {
-        target_profiles: [{
+        target_profile: {
           profile_name: CAREER_FIELDS.find(f => f.id === careerField)?.name || 'My Career',
+          target_titles: [],
+          priority_skills: [],
+          is_primary: true,
           career_field: careerField,
           career_stage: careerStage,
           job_types: jobTypes,
           company_types: companyTypes,
-          is_primary: true,
-        }],
+        },
       };
 
       const res = await fetch('/api/profile', {

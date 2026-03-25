@@ -87,18 +87,23 @@ export async function PUT(req: NextRequest) {
         .eq('is_primary', true)
         .single();
 
+      const profilePayload = {
+        profile_name: target_profile.profile_name,
+        target_titles: target_profile.target_titles || [],
+        priority_skills: target_profile.priority_skills || [],
+        career_field: target_profile.career_field || null,
+        career_stage: target_profile.career_stage || null,
+        job_types: target_profile.job_types || [],
+        company_types: target_profile.company_types || [],
+      };
+
       if (existing) {
-        await supabase.from('target_profiles').update({
-          profile_name: target_profile.profile_name,
-          target_titles: target_profile.target_titles || [],
-          priority_skills: target_profile.priority_skills || [],
-        }).eq('id', existing.id).eq('user_id', user.id);
+        await supabase.from('target_profiles').update(profilePayload)
+          .eq('id', existing.id).eq('user_id', user.id);
       } else {
         await supabase.from('target_profiles').insert({
           user_id: user.id,
-          profile_name: target_profile.profile_name,
-          target_titles: target_profile.target_titles || [],
-          priority_skills: target_profile.priority_skills || [],
+          ...profilePayload,
           is_primary: target_profile.is_primary !== false,
         });
       }
