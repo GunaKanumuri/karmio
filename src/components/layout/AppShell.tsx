@@ -26,7 +26,17 @@ export function AppShell({ children }: AppShellProps) {
 
   const displayName = user?.full_name?.split(' ')[0] || 'there';
   const displayTier = user?.subscription_tier || 'free';
-  const initials = user?.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
+
+  // Initials: first letter of first name + first letter of last name
+  const nameParts = user?.full_name?.trim().split(/\s+/) ?? [];
+  const initials = nameParts.length >= 2
+    ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
+    : (nameParts[0]?.[0] ?? 'U').toUpperCase();
+
+  // Short display: "Guna S" style
+  const shortName = nameParts.length >= 2
+    ? `${nameParts[0]} ${nameParts[nameParts.length - 1][0]}.`
+    : nameParts[0] ?? 'You';
 
   // Build usage text
   const weeklyUsage = (user as any)?.weekly_usage;
@@ -39,7 +49,11 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--color-bg-subtle)' }}>
       <div className="hidden md:block">
-        <Sidebar userInitials={initials} onSignOut={signOut} />
+        <Sidebar
+          userInitials={initials}
+          userName={shortName}
+          onSignOut={signOut}
+        />
       </div>
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar userName={displayName} tier={displayTier} usageText={usageText} onSignOut={signOut} />

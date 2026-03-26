@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
 
     // Posted within filter
     const timeMap: Record<string, number> = {
-      '1h': 3600000, '4h': 14400000, '1d': 86400000,
+      '1h': 3600000, '2h': 7200000, '4h': 14400000, '1d': 86400000,
       '2d': 172800000, '7d': 604800000,
     };
     if (postedWithin in timeMap) {

@@ -4,10 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/hooks/useAuth';
 import { IJobCardData } from '@/types';
-import { analyzeGhostJob, getGhostLabel, getGhostColor } from '@/lib/jobs/ghost-detector';
-import { MatchScoreExplainer } from '@/components/jobs/MatchScoreExplainer';
+import { analyzeGhostJob } from '@/lib/jobs/ghost-detector';
+import { JobCard } from '@/components/jobs/JobCard';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 export default function JobFeedPage() {
   const { user } = useAuth();
@@ -69,7 +68,7 @@ export default function JobFeedPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-surface-900 dark:text-white mb-1">Job feed</h1>
           <p className="text-surface-500">
-            Verified jobs from company career pages. Updated hourly.
+            Verified jobs from company career pages. Updated every 2 hours.
           </p>
         </div>
 
@@ -96,6 +95,7 @@ export default function JobFeedPage() {
               onChange={v => setFilters({ ...filters, posted_within: v })}
               options={[
                 { value: '1h', label: 'Last hour' },
+                { value: '2h', label: 'Last 2 hours' },
                 { value: '4h', label: 'Last 4 hours' },
                 { value: '1d', label: 'Last 24 hours' },
                 { value: '2d', label: 'Last 2 days' },
@@ -159,7 +159,7 @@ export default function JobFeedPage() {
         ) : filteredJobs.length > 0 ? (
           <div className="space-y-4">
             {filteredJobs.map(job => (
-              <JobCard key={job.id} job={job} onRefresh={fetchJobs} />
+              <JobCard key={job.id} job={job} onStatusChange={fetchJobs} />
             ))}
           </div>
         ) : (
@@ -200,215 +200,5 @@ function FilterSelect({ value, onChange, options }: {
         <option key={opt.value} value={opt.value}>{opt.label}</option>
       ))}
     </select>
-  );
-}
-
-function JobCard({ job, onRefresh }: { job: IJobCardData; onRefresh: () => void }) {
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [applying, setApplying] = useState(false);
-  const [applied, setApplied] = useState(false);
-  const [showMatchDetails, setShowMatchDetails] = useState(false);
-  const router = useRouter();
-
-  const ghostAnalysis = analyzeGhostJob(job);
-  const ghostLabel = getGhostLabel(ghostAnalysis);
-  const ghostColor = getGhostColor(ghostAnalysis);
-
-  const handleSave = async () => {
-    if (saved || saving) return;
-    setSaving(true);
-    try {
-      const res = await fetch('/api/applications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_id: job.id, status: 'saved' }),
-      });
-      const json = await res.json();
-      if (json.success || json.error?.code === 'DUPLICATE_APPLICATION') {
-        setSaved(true);
-      }
-    } catch {}
-    setSaving(false);
-  };
-
-  const handleApply = async () => {
-    if (applied || applying) return;
-    setApplying(true);
-    try {
-      await fetch('/api/applications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_id: job.id, status: 'applied', match_score: job.match_score || 0 }),
-      });
-      setApplied(true);
-    } catch {}
-    if (job.source_url && job.source_url !== '#') {
-      window.open(job.source_url, '_blank', 'noopener,noreferrer');
-    }
-    setApplying(false);
-  };
-
-  const logoUrl = `https://logo.clearbit.com/${job.company_name.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
-  const companyInitial = job.company_name.charAt(0).toUpperCase();
-
-  return (
-    <div className={`p-6 rounded-2xl border bg-white dark:bg-surface-900 transition-all hover:shadow-subtle ${
-      ghostAnalysis.ghostScore >= 30 
-        ? 'border-amber-200 dark:border-amber-800/50' 
-        : 'border-surface-200 dark:border-surface-700'
-    }`}>
-      <div className="flex items-start gap-4">
-        {/* Logo */}
-        <div className="w-12 h-12 rounded-xl border border-surface-200 dark:border-surface-700 flex items-center justify-center bg-white dark:bg-surface-800 overflow-hidden flex-shrink-0">
-          <img
-            src={logoUrl}
-            alt=""
-            className="w-8 h-8 object-contain"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-              (e.target as HTMLImageElement).parentElement!.innerHTML = `<span class="text-lg font-medium text-surface-400">${companyInitial}</span>`;
-            }}
-          />
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-medium text-surface-900 dark:text-white">{job.title}</h3>
-              <p className="text-surface-600 dark:text-surface-400">
-                {job.company_name} · {job.location}
-                {job.remote_type !== 'onsite' && ` · ${job.remote_type}`}
-              </p>
-            </div>
-            
-            {/* Match score */}
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-sm font-semibold flex-shrink-0 ${
-              job.match_score >= 80 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
-              job.match_score >= 60 ? 'bg-karmio-50 text-karmio-600 dark:bg-karmio-900/30 dark:text-karmio-400' :
-              'bg-surface-100 text-surface-500 dark:bg-surface-800'
-            }`}>
-              {job.match_score || 0}%
-            </div>
-          </div>
-
-          {/* Description preview */}
-          <p className="text-sm text-surface-500 mt-3 line-clamp-2">
-            {job.description_raw?.slice(0, 200)}...
-          </p>
-
-          {/* Badges */}
-          <div className="flex flex-wrap items-center gap-2 mt-4">
-            {/* Sponsorship */}
-            <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
-              job.sponsorship_status === 'yes' 
-                ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' 
-                : job.sponsorship_status === 'no'
-                ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                : 'bg-surface-100 text-surface-500 dark:bg-surface-800'
-            }`}>
-              {job.sponsorship_status === 'yes' ? 'Sponsors visa' : job.sponsorship_status === 'no' ? 'No sponsorship' : 'Sponsorship unknown'}
-            </span>
-
-            {/* Salary */}
-            {job.salary_min && job.salary_max && (
-              <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400">
-                ${Math.round(job.salary_min / 1000)}k – ${Math.round(job.salary_max / 1000)}k
-              </span>
-            )}
-
-            {/* Ghost indicator */}
-            {ghostLabel && (
-              <span className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1 ${
-                ghostColor === 'red' 
-                  ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400' 
-                  : 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
-              }`}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                {ghostLabel}
-              </span>
-            )}
-
-            {/* Source */}
-            <span className="text-xs text-surface-400 ml-auto">
-              via {job.source_type}
-            </span>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-3 mt-4 pt-4 border-t border-surface-100 dark:border-surface-800">
-            <button
-              onClick={handleSave}
-              disabled={saving || saved}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                saved 
-                  ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' 
-                  : 'border border-surface-200 dark:border-surface-700 text-surface-600 dark:text-surface-400 hover:bg-surface-50 dark:hover:bg-surface-800'
-              }`}
-              data-testid="job-save"
-            >
-              {saved ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                    <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-                  </svg>
-                  Saved
-                </>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
-                  </svg>
-                  {saving ? 'Saving...' : 'Save'}
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={() => router.push(`/dashboard/resumes/builder?job=${job.id}`)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-karmio-200 dark:border-karmio-800 text-karmio-600 dark:text-karmio-400 hover:bg-karmio-50 dark:hover:bg-karmio-900/30 transition-all"
-              data-testid="job-tailor"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                <path d="M14 2v6h6M9.663 17h4.673M12 3v1" />
-              </svg>
-              Tailor resume
-            </button>
-
-            <button
-              onClick={handleApply}
-              disabled={applying || applied}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                applied 
-                  ? 'bg-karmio-50 text-karmio-600 dark:bg-karmio-900/30 dark:text-karmio-400' 
-                  : 'bg-karmio-500 text-white hover:bg-karmio-600'
-              }`}
-              data-testid="job-apply"
-            >
-              {applied ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M5 12l5 5L20 7" />
-                  </svg>
-                  Applied
-                </>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                    <path d="M15 3h6v6M10 14L21 3" />
-                  </svg>
-                  {applying ? 'Opening...' : 'Apply'}
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }

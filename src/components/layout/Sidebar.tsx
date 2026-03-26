@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   LayoutDashboard, Search, FileText, Users, BookOpen,
-  BarChart3, CreditCard, Settings, LogOut, User
+  BarChart3, CreditCard, Settings, LogOut,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -18,11 +18,16 @@ const NAV_ITEMS = [
 
 const BOTTOM_ITEMS = [
   { href: '/dashboard/subscription', icon: CreditCard, label: 'Plan' },
-  { href: '/dashboard/resumes/profile', icon: User, label: 'Profile' },
   { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
 ];
 
-export function Sidebar({ userInitials = 'U', onSignOut }: { userInitials?: string; onSignOut?: () => void }) {
+interface SidebarProps {
+  userInitials?: string;
+  userName?: string;       // e.g. "Guna S" or full name
+  onSignOut?: () => void;
+}
+
+export function Sidebar({ userInitials = 'U', userName, onSignOut }: SidebarProps) {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
@@ -52,10 +57,10 @@ export function Sidebar({ userInitials = 'U', onSignOut }: { userInitials?: stri
 
       <div className="flex-1" />
 
-      {/* Bottom nav — Plan, Profile, Settings */}
+      {/* Bottom nav — Plan, Settings (no separate Profile item) */}
       <nav className="flex flex-col gap-1">
         {BOTTOM_ITEMS.map((item) => (
-          <NavItem key={item.href + item.label} item={item} active={isActive(item.href) && item.label !== 'Profile'} />
+          <NavItem key={item.href + item.label} item={item} active={isActive(item.href)} />
         ))}
       </nav>
 
@@ -74,10 +79,35 @@ export function Sidebar({ userInitials = 'U', onSignOut }: { userInitials?: stri
         </div>
       </button>
 
-      {/* Avatar */}
-      <div className="mt-2 w-9 h-9 rounded-full bg-karmio-100 dark:bg-karmio-900/50 flex items-center justify-center text-xs font-semibold text-karmio-700 dark:text-karmio-300 ring-2 ring-karmio-200 dark:ring-karmio-800/50">
-        {userInitials}
-      </div>
+      {/* Avatar — acts as profile link, tooltip shows full name */}
+      <Link
+        href="/dashboard/resumes/profile"
+        className="group relative mt-2"
+        data-testid="sidebar-avatar"
+        title={userName || 'Your profile'}
+      >
+        <div
+          className={`
+            w-9 h-9 rounded-full flex items-center justify-center
+            text-xs font-semibold
+            bg-karmio-100 dark:bg-karmio-900/50
+            text-karmio-700 dark:text-karmio-300
+            ring-2 ring-karmio-200 dark:ring-karmio-800/50
+            transition-all duration-150
+            group-hover:ring-karmio-400 dark:group-hover:ring-karmio-600
+            group-hover:shadow-md group-hover:scale-105
+          `}
+        >
+          {userInitials}
+        </div>
+
+        {/* Tooltip with full name */}
+        {userName && (
+          <span className="absolute left-[46px] bottom-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-900 dark:bg-surface-100 text-white dark:text-surface-900 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 shadow-lg">
+            {userName}
+          </span>
+        )}
+      </Link>
     </aside>
   );
 }

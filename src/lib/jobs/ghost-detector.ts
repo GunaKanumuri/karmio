@@ -1,6 +1,6 @@
 /**
  * Ghost Job Detector
- * 
+ *
  * Identifies potentially stale or "ghost" job postings that may no longer
  * be actively recruiting. These are jobs that:
  * - Have been posted for over 60 days

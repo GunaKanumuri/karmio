@@ -59,7 +59,7 @@ export interface IJobFilters {
   experience_max?: number;
   salary_min?: number;
   company_size?: string[];
-  posted_within?: '1h' | '4h' | '1d' | '2d' | '7d';
+  posted_within?: '1h' | '2h' | '4h' | '1d' | '2d' | '7d';
   realness_min?: number;
   profile_id?: string;
   sort_by?: 'match' | 'date' | 'realness';

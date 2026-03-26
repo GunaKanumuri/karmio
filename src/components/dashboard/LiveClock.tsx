@@ -5,21 +5,34 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Calendar, Clock } from 'lucide-react';
 
-// === LiveClock ===
-export function LiveClock() {
+// === LiveClock (standalone — used if needed outside TopBar) ===
+export function LiveClock({ country = 'US' }: { country?: 'US' | 'IN' }) {
   const [time, setTime] = useState('');
   const [date, setDate] = useState('');
+
+  // Country controls locale/format only — timezone is always the browser's local
+  const locale = country === 'IN' ? 'en-IN' : 'en-US';
 
   useEffect(() => {
     const tick = () => {
       const now = new Date();
-      setTime(now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }));
-      setDate(now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
+      setTime(now.toLocaleTimeString(locale, {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      }));
+      setDate(now.toLocaleDateString(locale, {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      }));
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [locale]);
 
   return (
     <div className="text-right">

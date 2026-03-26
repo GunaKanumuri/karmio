@@ -1,31 +1,53 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import type { Country } from '@/types';
 
-export function TopBar({ userName, tier, usageText, onSignOut }: {
+// Country only controls FORMAT, not timezone.
+// Timezone always comes from the user's browser.
+const LOCALE_CONFIG: Record<Country, { locale: string; hour12: boolean; dateStyle: 'US' | 'IN' }> = {
+  US: { locale: 'en-US', hour12: true, dateStyle: 'US' },
+  IN: { locale: 'en-IN', hour12: true, dateStyle: 'IN' },
+};
+
+export function TopBar({ userName, tier, usageText, country = 'US', onSignOut }: {
   userName: string;
   tier: 'free' | 'popular' | 'pro';
   usageText?: string;
+  country?: Country;
   onSignOut?: () => void;
 }) {
   const [time, setTime] = useState('');
   const [date, setDate] = useState('');
 
   useEffect(() => {
+    const config = LOCALE_CONFIG[country] || LOCALE_CONFIG.US;
+    // Browser's local timezone — no timeZone override means it uses system timezone
     const tick = () => {
       const now = new Date();
-      setTime(now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }));
-      setDate(now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
+      setTime(now.toLocaleTimeString(config.locale, {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: config.hour12,
+      }));
+      setDate(now.toLocaleDateString(config.locale, {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      }));
     };
+
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [country]);
 
   const greeting = getGreeting();
 
   return (
-    <header className="h-[72px] px-6 flex items-center justify-between border-b border-slate-200 dark:border-slate-800" style={{ background: 'var(--color-bg-card, #fff)' }}>
+    <header className="h-[72px] px-6 flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
       {/* Left: Greeting + subtitle */}
       <div className="min-w-0">
         <h1 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
@@ -46,7 +68,7 @@ export function TopBar({ userName, tier, usageText, onSignOut }: {
           </div>
         )}
 
-        {/* Live clock — bold and clean */}
+        {/* Live clock */}
         <div className="text-right hidden sm:block">
           <p className="text-2xl font-bold text-slate-900 dark:text-white font-mono tracking-tight leading-none">
             {time}
@@ -58,6 +80,7 @@ export function TopBar({ userName, tier, usageText, onSignOut }: {
   );
 }
 
+// Greeting based on browser's local time — no hardcoded timezone
 function getGreeting(): string {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';

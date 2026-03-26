@@ -206,7 +206,7 @@ export default function DashboardHomePage() {
                   <Search size={22} className="text-slate-400" />
                 </div>
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">No new jobs today yet</p>
-                <p className="text-xs text-slate-400 mb-4">Jobs are fetched every few hours. Check back soon!</p>
+                <p className="text-xs text-slate-400 mb-4">Jobs are fetched every 2 hours from real career pages. Check back soon!</p>
                 <Link href="/dashboard/jobs/feed" className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-karmio-600 bg-karmio-50 dark:bg-karmio-900/20 rounded-xl hover:bg-karmio-100 dark:hover:bg-karmio-900/30 transition-colors">
                   Browse all jobs <ArrowRight size={14} />
                 </Link>

@@ -21,7 +21,8 @@ export function JobFilters({ filters, onChange, showSponsorship = true }: JobFil
           onChange={e => update({ search: e.target.value })} />
       </div>
       <Select options={[
-        { value: '1h', label: 'Last hour' }, { value: '4h', label: 'Last 4 hours' },
+        { value: '1h', label: 'Last hour' }, { value: '2h', label: 'Last 2 hours' },
+        { value: '4h', label: 'Last 4 hours' },
         { value: '1d', label: 'Last 24 hours' }, { value: '2d', label: 'Last 2 days' },
         { value: '7d', label: 'Last 7 days' },
       ]} value={filters.posted_within || '7d'} onChange={e => update({ posted_within: e.target.value as any })} />
