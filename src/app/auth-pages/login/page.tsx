@@ -16,6 +16,7 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect');
   const oauthError = searchParams.get('error');
+  const signupSuccess = searchParams.get('signup') === 'success';
 
   useEffect(() => {
     if (oauthError) {

@@ -17,10 +17,11 @@
   --color-brand-light: #EEF2FF;
   --color-brand-subtle: #F5F3FF;
   
-  /* Neutral surfaces */
-  --color-bg: #FFFFFF;
-  --color-bg-subtle: #FAFAFA;
-  --color-bg-muted: #F4F4F5;
+  /* Neutral surfaces — calm, warm-tinted */
+  --color-bg: #FAFBFD;
+  --color-bg-subtle: #F5F7FA;
+  --color-bg-muted: #EDF0F7;
+  --color-bg-card: #FFFFFF;
   
   /* Text hierarchy */
   --color-text: #18181B;

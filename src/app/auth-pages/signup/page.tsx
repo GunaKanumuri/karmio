@@ -223,14 +223,13 @@ export default function SignupPage() {
                     {[1, 2, 3, 4].map(level => (
                       <div
                         key={level}
-                        className={`h-1 flex-1 rounded-full transition-colors ${
-                          passwordStrength >= level
+                        className={`h-1 flex-1 rounded-full transition-colors ${passwordStrength >= level
                             ? passwordStrength <= 1 ? 'bg-red-500'
-                            : passwordStrength <= 2 ? 'bg-amber-500'
-                            : passwordStrength <= 3 ? 'bg-emerald-400'
-                            : 'bg-emerald-500'
+                              : passwordStrength <= 2 ? 'bg-amber-500'
+                                : passwordStrength <= 3 ? 'bg-emerald-400'
+                                  : 'bg-emerald-500'
                             : 'bg-surface-200 dark:bg-surface-700'
-                        }`}
+                          }`}
                       />
                     ))}
                   </div>

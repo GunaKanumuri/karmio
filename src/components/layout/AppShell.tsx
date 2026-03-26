@@ -37,7 +37,7 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-50 dark:bg-surface-950">
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--color-bg-subtle)' }}>
       <div className="hidden md:block">
         <Sidebar userInitials={initials} onSignOut={signOut} />
       </div>

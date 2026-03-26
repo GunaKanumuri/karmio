@@ -31,18 +31,28 @@ export function useJobFeed(filters: IJobFilters) {
   });
 }
 
-// ─── Today's matches ───
-export function useTodayMatches() {
+// ─── Today's job stats (real-time fetch tracking) ───
+export function useTodayJobStats() {
   return useQuery({
-    queryKey: ['jobs', 'today'],
+    queryKey: ['jobs', 'today-stats'],
     queryFn: async () => {
-      const res = await fetchAPI<IJobCardData[]>('/jobs', { params: { posted_within: '1d', sort_by: 'match', limit: '5' } });
-      return res.data || [];
+      const res = await fetchAPI<{ total_today: number; latest_batch: number; jobs: IJobCardData[] }>('/jobs/today');
+      return res.data || { total_today: 0, latest_batch: 0, jobs: [] };
     },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,       // 5 min
+    gcTime: 30 * 60 * 1000,          // 30 min gc
     refetchOnWindowFocus: true,
+    refetchInterval: 5 * 60 * 1000,  // poll every 5 min
   });
+}
+
+// ─── Backward compat ───
+export function useTodayMatches() {
+  const query = useTodayJobStats();
+  return {
+    ...query,
+    data: query.data?.jobs || [],
+  };
 }
 
 // ─── Mutations ───
