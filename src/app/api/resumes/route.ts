@@ -11,6 +11,41 @@ interface ResumeGenerateRequest {
   action: 'generate' | 'cover_letter';
 }
 
+// Add this BEFORE the existing POST handler in src/app/api/resumes/route.ts
+
+export async function GET(req: NextRequest) {
+  try {
+    const supabase = await createServerSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: { code: 'AUTH_REQUIRED', message: 'Please sign in.' } },
+        { status: 401 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from('resume_recipes')
+      .select('*, job_postings(id, title, company_name, location)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return NextResponse.json(
+        { success: false, error: { code: 'QUERY_FAILED', message: 'Could not fetch resumes.' } },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data: data || [] });
+  } catch {
+    return NextResponse.json(
+      { success: false, error: { code: 'INTERNAL_ERROR', message: 'Something went wrong.' } },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createServerSupabase();

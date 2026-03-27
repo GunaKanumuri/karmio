@@ -58,7 +58,6 @@ export async function PUT(
     }
 
     const body = await req.json();
-    // Use the existing validation schema — inject the id from URL
     const input = { ...body, id: params.id };
     const validation = validateInput(updateApplicationSchema, input);
     if (!validation.success) {
@@ -87,10 +86,8 @@ export async function PUT(
       return NextResponse.json({ success: true, data: { deleted: true } });
     }
 
-    // Add timestamp
     (updates as any).updated_at = new Date().toISOString();
 
-    // Set applied_at when first moving to "applied"
     if (updates.status === 'applied') {
       updates.applied_at = new Date().toISOString();
     }
@@ -111,7 +108,7 @@ export async function PUT(
       );
     }
 
-    // Auto-create follow-ups when status changes to "applied"
+    // Auto-create follow-ups + outreach when status changes to "applied"
     if (updates.status === 'applied' && application.applied_at) {
       try {
         const appliedDate = new Date(application.applied_at);
@@ -123,12 +120,20 @@ export async function PUT(
           day_number: dayOffset,
           is_completed: false,
         }));
-
         await supabase.from('follow_ups').insert(followUps);
       } catch (followUpErr) {
-        // Non-blocking — log but don't fail the main request
         console.error('[PUT /api/applications/[id]] follow-up creation error:', followUpErr);
       }
+
+      // Auto-generate outreach suggestions
+      try {
+        const origin = req.nextUrl.origin;
+        await fetch(`${origin}/api/network/suggest`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Cookie': req.headers.get('cookie') || '' },
+          body: JSON.stringify({ application_id: application.id, job_id: application.job_id || application.job?.id }),
+        });
+      } catch {}
     }
 
     return NextResponse.json({ success: true, data: application });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-
+import { generateDedupHash } from '@/lib/matching/dedup-hash';
 // =============================================================================
 // KARMIO JOB FETCHER v2 — Dynamic Company Expansion
 //
@@ -576,15 +576,6 @@ async function upsertJobs(supabase: any, jobs: RawJob[]): Promise<{ new: number;
 // =============================================================================
 // HELPERS
 // =============================================================================
-function generateDedupHash(company: string, title: string, location: string): string {
-  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
-  const input = `${normalize(company)}|${normalize(title)}|${normalize(location)}`;
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) { hash = ((hash << 5) - hash) + input.charCodeAt(i); hash = hash & hash; }
-  const hex = Math.abs(hash).toString(16).padStart(8, '0');
-  const extra = (input.length * 31 + input.charCodeAt(0) * 17).toString(16).padStart(8, '0');
-  return `${hex}${extra}${input.length.toString(16).padStart(4, '0')}`;
-}
 
 function stripHtml(html: string): string {
   return html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/?(p|div|li|h[1-6])[^>]*>/gi, '\n')
@@ -623,9 +614,177 @@ function detectRemoteType(location: string, title: string, description: string):
 }
 
 function detectCountry(location: string): string {
-  const loc = location.toLowerCase();
-  const india = ['india','bangalore','bengaluru','mumbai','hyderabad','delhi','pune','chennai','gurgaon','noida','kolkata','ahmedabad','jaipur','kochi','lucknow'];
-  return india.some(kw => loc.includes(kw)) ? 'IN' : 'US';
+  const loc = location.toLowerCase().trim();
+  
+  // If location is empty or unknown, default to US
+  if (!loc || loc === 'unknown' || loc === 'n/a') return 'US';
+
+  // Greenhouse/Lever often include country directly: "San Francisco, CA, United States"
+  // Check for explicit country names first (most reliable)
+  const countryMap: [RegExp, string][] = [
+    [/\bunited states\b|\busa\b|\bu\.s\.a\b|\bu\.s\b/i, 'US'],
+    [/\bindia\b/i, 'IN'],
+    [/\bunited kingdom\b|\b uk\b|\bengland\b|\bscotland\b|\bwales\b/i, 'GB'],
+    [/\bcanada\b/i, 'CA'],
+    [/\bgermany\b|\bdeutschland\b/i, 'DE'],
+    [/\bfrance\b/i, 'FR'],
+    [/\baustralia\b/i, 'AU'],
+    [/\bsingapore\b/i, 'SG'],
+    [/\bnetherlands\b|\bholland\b/i, 'NL'],
+    [/\bireland\b/i, 'IE'],
+    [/\bjapan\b/i, 'JP'],
+    [/\bisrael\b/i, 'IL'],
+    [/\bbrazil\b|\bbrasil\b/i, 'BR'],
+    [/\bspain\b|\bespaña\b/i, 'ES'],
+    [/\bitaly\b|\bitalia\b/i, 'IT'],
+    [/\bsouth korea\b|\bkorea\b/i, 'KR'],
+    [/\bsweden\b/i, 'SE'],
+    [/\bswitzerland\b|\bschweiz\b/i, 'CH'],
+    [/\bpoland\b|\bpolska\b/i, 'PL'],
+    [/\bportugal\b/i, 'PT'],
+    [/\bdenmark\b/i, 'DK'],
+    [/\bnorway\b/i, 'NO'],
+    [/\bfinland\b/i, 'FI'],
+    [/\baustria\b|\bösterreich\b/i, 'AT'],
+    [/\bbelgium\b/i, 'BE'],
+    [/\bmexico\b|\bméxico\b/i, 'MX'],
+    [/\bargentina\b/i, 'AR'],
+    [/\bchile\b/i, 'CL'],
+    [/\bcolombia\b/i, 'CO'],
+    [/\bnew zealand\b/i, 'NZ'],
+    [/\bphilippines\b/i, 'PH'],
+    [/\bmalaysia\b/i, 'MY'],
+    [/\bthailand\b/i, 'TH'],
+    [/\bvietnam\b/i, 'VN'],
+    [/\bindonesia\b/i, 'ID'],
+    [/\btaiwan\b/i, 'TW'],
+    [/\bchina\b/i, 'CN'],
+    [/\bemirates\b|\buae\b|\bdubai\b|\babu dhabi\b/i, 'AE'],
+  ];
+
+  for (const [pattern, code] of countryMap) {
+    if (pattern.test(loc)) return code;
+  }
+
+  // Check for US state abbreviations: "San Francisco, CA" or "New York, NY"
+  const usState = loc.match(/,\s*([A-Z]{2})\s*$/);
+  if (usState) {
+    const US_STATES = new Set(['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC']);
+    if (US_STATES.has(usState[1])) return 'US';
+  }
+
+  // Check for major Indian cities (Greenhouse often lists just city names)
+  const indianCities = ['bangalore','bengaluru','mumbai','hyderabad','delhi','new delhi','pune','chennai','gurgaon','gurugram','noida','kolkata','ahmedabad','jaipur','kochi','lucknow','chandigarh','indore','thiruvananthapuram','coimbatore'];
+  if (indianCities.some(c => loc.includes(c))) return 'IN';
+
+  // Check for major UK cities
+  const ukCities = ['london','manchester','birmingham','edinburgh','glasgow','bristol','leeds','cambridge','oxford','belfast','cardiff','liverpool','nottingham','reading','brighton'];
+  if (ukCities.some(c => loc.includes(c))) return 'GB';
+
+  // Check for major Canadian cities
+  const caCities = ['toronto','vancouver','montreal','montréal','ottawa','calgary','edmonton','winnipeg','waterloo','kitchener','halifax','victoria'];
+  if (caCities.some(c => loc.includes(c))) return 'CA';
+
+  // Check for major German cities
+  const deCities = ['berlin','munich','münchen','hamburg','frankfurt','cologne','köln','düsseldorf','stuttgart','dresden','leipzig'];
+  if (deCities.some(c => loc.includes(c))) return 'DE';
+
+  // Check for major French cities
+  const frCities = ['paris','lyon','marseille','toulouse','lille','bordeaux','nantes','strasbourg'];
+  if (frCities.some(c => loc.includes(c))) return 'FR';
+
+  // Check for major Australian cities
+  const auCities = ['sydney','melbourne','brisbane','perth','adelaide','canberra'];
+  if (auCities.some(c => loc.includes(c))) return 'AU';
+
+  // Check for Dutch cities
+  const nlCities = ['amsterdam','rotterdam','den haag','the hague','eindhoven','utrecht'];
+  if (nlCities.some(c => loc.includes(c))) return 'NL';
+
+  // Check for Irish cities
+  const ieCities = ['dublin','cork','galway','limerick'];
+  if (ieCities.some(c => loc.includes(c))) return 'IE';
+
+  // "Remote" without country context → US (most seed companies are US-based)
+  if (loc.includes('remote')) return 'US';
+
+  // Default: US (Greenhouse/Lever are primarily US platforms)
+  return 'US';
+}
+
+
+function parseJobMetadata(text: string, title: string, location: string) {
+  let salary_min: number | null = null, salary_max: number | null = null;
+  let salary_currency = 'USD';
+  let experience_min: number | null = null, experience_max: number | null = null;
+
+  // USD: $120,000 - $180,000 or $120K-$180K
+  const usd = text.match(/\$\s*([\d,]+)(?:k|K)?\s*[-\u2013to]+\s*\$?\s*([\d,]+)(?:k|K)?/);
+  if (usd) {
+    let mn = parseInt(usd[1].replace(/,/g, '')), mx = parseInt(usd[2].replace(/,/g, ''));
+    if (mn < 1000) mn *= 1000; if (mx < 1000) mx *= 1000;
+    salary_min = mn; salary_max = mx; salary_currency = 'USD';
+  }
+
+  // INR: ₹12-18 LPA or Rs.12-18 Lakhs
+  const inr = text.match(/(?:\u20b9|Rs\.?)\s*([\d.]+)\s*[-\u2013to]*\s*([\d.]+)?\s*(?:LPA|lpa|Lakhs)/);
+  if (inr) {
+    salary_min = Math.round(parseFloat(inr[1]) * 100000);
+    salary_max = inr[2] ? Math.round(parseFloat(inr[2]) * 100000) : salary_min;
+    salary_currency = 'INR';
+  }
+
+  // GBP: £50,000 - £80,000
+  const gbp = text.match(/£\s*([\d,]+)(?:k|K)?\s*[-\u2013to]+\s*£?\s*([\d,]+)(?:k|K)?/);
+  if (gbp && !usd) {
+    let mn = parseInt(gbp[1].replace(/,/g, '')), mx = parseInt(gbp[2].replace(/,/g, ''));
+    if (mn < 1000) mn *= 1000; if (mx < 1000) mx *= 1000;
+    salary_min = mn; salary_max = mx; salary_currency = 'GBP';
+  }
+
+  // EUR: €60,000 - €90,000
+  const eur = text.match(/€\s*([\d,]+)(?:k|K)?\s*[-\u2013to]+\s*€?\s*([\d,]+)(?:k|K)?/);
+  if (eur && !usd && !gbp) {
+    let mn = parseInt(eur[1].replace(/,/g, '')), mx = parseInt(eur[2].replace(/,/g, ''));
+    if (mn < 1000) mn *= 1000; if (mx < 1000) mx *= 1000;
+    salary_min = mn; salary_max = mx; salary_currency = 'EUR';
+  }
+
+  // CAD: CA$80,000 - CA$120,000
+  const cad = text.match(/(?:CA|C)\$\s*([\d,]+)(?:k|K)?\s*[-\u2013to]+\s*(?:CA|C)?\$?\s*([\d,]+)(?:k|K)?/);
+  if (cad && !usd) {
+    let mn = parseInt(cad[1].replace(/,/g, '')), mx = parseInt(cad[2].replace(/,/g, ''));
+    if (mn < 1000) mn *= 1000; if (mx < 1000) mx *= 1000;
+    salary_min = mn; salary_max = mx; salary_currency = 'CAD';
+  }
+
+  // AUD: A$90,000 - A$130,000
+  const aud = text.match(/A\$\s*([\d,]+)(?:k|K)?\s*[-\u2013to]+\s*A?\$?\s*([\d,]+)(?:k|K)?/);
+  if (aud && !usd && !cad) {
+    let mn = parseInt(aud[1].replace(/,/g, '')), mx = parseInt(aud[2].replace(/,/g, ''));
+    if (mn < 1000) mn *= 1000; if (mx < 1000) mx *= 1000;
+    salary_min = mn; salary_max = mx; salary_currency = 'AUD';
+  }
+
+  // If no salary found from regex but country suggests non-USD, tag currency from location
+  if (!salary_min && !salary_max) {
+    const country = detectCountry(location);
+    const currencyByCountry: Record<string, string> = {
+      'GB': 'GBP', 'IN': 'INR', 'DE': 'EUR', 'FR': 'EUR', 'NL': 'EUR',
+      'IE': 'EUR', 'ES': 'EUR', 'IT': 'EUR', 'AT': 'EUR', 'BE': 'EUR',
+      'CA': 'CAD', 'AU': 'AUD', 'SG': 'SGD', 'JP': 'JPY', 'CH': 'CHF',
+    };
+    salary_currency = currencyByCountry[country] || 'USD';
+  }
+
+  // Experience years
+  const em = text.match(/(\d+)\+?\s*(?:[-\u2013to]+\s*(\d+))?\s*years?\s*(?:of\s*)?(?:experience|exp)/i);
+  if (em) {
+    experience_min = parseInt(em[1]);
+    experience_max = em[2] ? parseInt(em[2]) : null;
+  }
+
+  return { salary_min, salary_max, salary_currency, experience_min, experience_max };
 }
 
 function detectSponsorship(description: string): 'yes' | 'no' | 'unknown' {
@@ -647,22 +806,6 @@ function computeRealnessScore(job: RawJob): number {
   if (job.salary_min && job.salary_max) s += 5;
   if (job.experience_years_min !== null) s += 5;
   return Math.min(100, s);
-}
-
-function parseJobMetadata(text: string, title: string, location: string) {
-  let salary_min: number | null = null, salary_max: number | null = null, salary_currency = 'USD';
-  let experience_min: number | null = null, experience_max: number | null = null;
-  const sm = text.match(/\$\s*([\d,]+)(?:k|K)?\s*[-\u2013to]+\s*\$?\s*([\d,]+)(?:k|K)?/);
-  if (sm) {
-    let mn = parseInt(sm[1].replace(/,/g, '')), mx = parseInt(sm[2].replace(/,/g, ''));
-    if (mn < 1000) mn *= 1000; if (mx < 1000) mx *= 1000;
-    salary_min = mn; salary_max = mx;
-  }
-  const im = text.match(/(?:\u20b9|Rs\.?)\s*([\d.]+)\s*[-\u2013to]*\s*([\d.]+)?\s*(?:LPA|lpa|Lakhs)/);
-  if (im) { salary_min = Math.round(parseFloat(im[1]) * 100000); salary_max = im[2] ? Math.round(parseFloat(im[2]) * 100000) : salary_min; salary_currency = 'INR'; }
-  const em = text.match(/(\d+)\+?\s*(?:[-\u2013to]+\s*(\d+))?\s*years?\s*(?:of\s*)?(?:experience|exp)/i);
-  if (em) { experience_min = parseInt(em[1]); experience_max = em[2] ? parseInt(em[2]) : null; }
-  return { salary_min, salary_max, salary_currency, experience_min, experience_max };
 }
 
 function parseJD(text: string, title: string): object {

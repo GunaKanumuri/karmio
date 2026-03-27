@@ -1,87 +1,73 @@
 'use client';
 
 import { useState } from 'react';
+import { useGenerateCoverLetter } from '@/hooks/useResume';
+import { FileText, Loader2, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Textarea } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
-import { FileText, Sparkles, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface CoverLetterToggleProps {
-  resumeId: string;
-  existingLetter?: string | null;
+  jobId: string;
   companyName: string;
-  roleTitle: string;
+  jobTitle: string;
+  existingLetter?: string | null;
 }
 
-export function CoverLetterToggle({ resumeId, existingLetter, companyName, roleTitle }: CoverLetterToggleProps) {
-  const [expanded, setExpanded] = useState(false);
+export function CoverLetterToggle({ jobId, companyName, jobTitle, existingLetter }: CoverLetterToggleProps) {
+  const [isOpen, setIsOpen] = useState(false);
   const [letter, setLetter] = useState(existingLetter || '');
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const generateMutation = useGenerateCoverLetter();
+
   const handleGenerate = async () => {
-    setGenerating(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/resumes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resume_id: resumeId, action: 'cover_letter' }),
-      });
-      const json = await res.json();
-      if (json.success && json.data?.cover_letter_text) {
-        setLetter(json.data.cover_letter_text);
-      } else {
-        setError(json.error?.message || 'Could not generate cover letter.');
-      }
-    } catch {
-      setError('Network error.');
+    const result = await generateMutation.mutateAsync({ job_id: jobId });
+    if (result.success && result.data?.cover_letter_text) {
+      setLetter(result.data.cover_letter_text);
+      setIsOpen(true);
     }
-    setGenerating(false);
   };
 
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(letter);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(letter);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
     <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
-      <button onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-        <div className="flex items-center gap-2">
-          <FileText size={16} className="text-karmio-500" />
-          <span className="text-sm font-medium text-slate-800 dark:text-slate-200">Cover letter</span>
-          {letter ? <Badge variant="success">Generated</Badge> : <Badge>Not generated</Badge>}
+      <button
+        onClick={() => letter ? setIsOpen(!isOpen) : handleGenerate()}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+      >
+        <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+          <FileText size={14} className="text-karmio-500" />
+          Cover Letter
+          {letter && <span className="text-[10px] text-emerald-500 font-semibold">Generated</span>}
         </div>
-        {expanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+        {generateMutation.isPending ? (
+          <Loader2 size={14} className="animate-spin text-karmio-500" />
+        ) : letter ? (
+          isOpen ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />
+        ) : (
+          <span className="text-xs text-karmio-600 font-medium">Generate</span>
+        )}
       </button>
 
-      {expanded && (
+      {isOpen && letter && (
         <div className="px-4 pb-4 border-t border-slate-100 dark:border-slate-800">
-          {letter ? (
-            <div className="mt-3">
-              <div className="flex justify-end gap-1 mb-2">
-                <Button size="sm" variant="ghost" onClick={handleCopy}>
-                  {copied ? <><Check size={13} className="text-emerald-500" /> Copied</> : <><Copy size={13} /> Copy</>}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={handleGenerate} loading={generating}>
-                  <Sparkles size={13} className="mr-1" />Regenerate
-                </Button>
-              </div>
-              <Textarea value={letter} onChange={e => setLetter(e.target.value)} rows={10} className="text-xs" />
-            </div>
-          ) : (
-            <div className="mt-3 text-center py-4">
-              <p className="text-xs text-slate-500 mb-3">Generate an AI cover letter tailored for {companyName} — {roleTitle}</p>
-              <Button variant="primary" size="sm" onClick={handleGenerate} loading={generating}>
-                <Sparkles size={13} className="mr-1" />Generate cover letter
-              </Button>
-              {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
-            </div>
-          )}
+          <div className="mt-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+              {letter}
+            </p>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <Button size="sm" onClick={handleCopy}>
+              {copied ? <><Check size={12} className="mr-1" />Copied</> : <><Copy size={12} className="mr-1" />Copy</>}
+            </Button>
+            <Button size="sm" onClick={handleGenerate} loading={generateMutation.isPending}>
+              Regenerate
+            </Button>
+          </div>
         </div>
       )}
     </div>

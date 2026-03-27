@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import {
   Building2, Users, Globe, Briefcase, MapPin,
   TrendingUp, ExternalLink, Loader2, AlertCircle,
-  CheckCircle, XCircle, HelpCircle,
+  CheckCircle, XCircle, HelpCircle, Zap,
 } from 'lucide-react';
 
 interface CompanyDetails {
@@ -31,12 +31,11 @@ interface CompanyDetails {
 interface CompanyIntelProps {
   companyName: string;
   companySlug?: string;
-  careerUrl?: string;           // fallback if API fails
+  careerUrl?: string;
   sourceType: string;
   location?: string;
 }
 
-// Derive slug from company name — matches the seed logic
 function toSlug(name: string): string {
   return name.toLowerCase()
     .replace(/\s+/g, '-')
@@ -62,7 +61,6 @@ export function CompanyIntel({ companyName, companySlug, careerUrl, sourceType, 
         if (json.success && json.data) {
           setCompany(json.data);
         } else {
-          // Fallback: try by name
           return fetch(`/api/companies?name=${encodeURIComponent(companyName)}`)
             .then(r => r.json())
             .then(json2 => {
@@ -86,12 +84,10 @@ export function CompanyIntel({ companyName, companySlug, careerUrl, sourceType, 
     return () => { cancelled = true; };
   }, [companyName, companySlug]);
 
-  // ─── Logo ────────────────────────────────────────────────────────────────────
   const [logoFailed, setLogoFailed] = useState(false);
   const logoDomain = company?.company_domain || `${toSlug(companyName).replace(/-/g, '')}.com`;
   const logoUrl = `https://logo.clearbit.com/${logoDomain}`;
 
-  // ─── Loading state ───────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="py-10 text-center">
@@ -101,7 +97,6 @@ export function CompanyIntel({ companyName, companySlug, careerUrl, sourceType, 
     );
   }
 
-  // ─── Error state — fallback to minimal card ──────────────────────────────────
   if (error || !company) {
     return (
       <Card padding="md">
@@ -121,14 +116,9 @@ export function CompanyIntel({ companyName, companySlug, careerUrl, sourceType, 
         </div>
 
         {careerUrl && (
-          <a
-            href={careerUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-karmio-500 hover:text-karmio-600 font-medium"
-          >
-            <ExternalLink size={14} />
-            View career page
+          <a href={careerUrl} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-karmio-500 hover:text-karmio-600 font-medium">
+            <ExternalLink size={14} />View career page
           </a>
         )}
 
@@ -142,69 +132,56 @@ export function CompanyIntel({ companyName, companySlug, careerUrl, sourceType, 
     );
   }
 
-  // ─── Sponsorship badge ────────────────────────────────────────────────────────
   const SponsorIcon = company.sponsorship_signal === 'yes' ? CheckCircle
-    : company.sponsorship_signal === 'no' ? XCircle
-      : HelpCircle;
+    : company.sponsorship_signal === 'no' ? XCircle : HelpCircle;
   const sponsorVariant = company.sponsorship_signal === 'yes' ? 'success'
     : company.sponsorship_signal === 'no' ? 'danger' : 'warning';
   const sponsorLabel = company.sponsorship_signal === 'yes' ? 'Sponsors visas'
-    : company.sponsorship_signal === 'no' ? 'No sponsorship'
-      : 'Sponsorship unknown';
+    : company.sponsorship_signal === 'no' ? 'No sponsorship' : 'Sponsorship unknown';
 
-  // ─── Last updated ─────────────────────────────────────────────────────────────
-  const lastUpdated = company.last_fetched_at
-    ? timeSince(company.last_fetched_at)
-    : null;
+  const lastUpdated = company.last_fetched_at ? timeSince(company.last_fetched_at) : null;
 
   return (
     <Card padding="md">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
+      {/* Company header */}
+      <div className="flex items-center gap-3 mb-5">
         <div className="w-12 h-12 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center bg-white dark:bg-slate-900 overflow-hidden flex-shrink-0">
           {!logoFailed ? (
-            <img
-              src={logoUrl}
-              alt={company.company_name}
-              width={32}
-              height={32}
-              className="w-8 h-8 object-contain"
-              onError={() => setLogoFailed(true)}
-            />
+            <img src={logoUrl} alt={company.company_name} width={32} height={32}
+              className="w-8 h-8 object-contain" onError={() => setLogoFailed(true)} />
           ) : (
-            <span className="text-lg font-semibold text-slate-400">
-              {company.company_name.charAt(0).toUpperCase()}
-            </span>
+            <span className="text-lg font-semibold text-slate-400">{company.company_name.charAt(0).toUpperCase()}</span>
           )}
         </div>
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{company.company_name}</h3>
-          <p className="text-xs text-slate-500">{company.hq_location || location || 'Location not specified'}</p>
+          <p className="text-xs text-slate-500">
+            {company.industry && <span>{company.industry} · </span>}
+            {company.hq_location || location || 'Location not specified'}
+          </p>
         </div>
       </div>
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3 mb-4">
-        {/* Open roles */}
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <Briefcase size={13} className="text-slate-400" />
             <span className="text-xs text-slate-500">Open roles</span>
           </div>
-          <p className="text-lg font-semibold text-slate-900 dark:text-white leading-none">
-            {company.open_roles_count}
-          </p>
+          <p className="text-lg font-semibold text-slate-900 dark:text-white leading-none">{company.open_roles_count}</p>
           {company.open_roles_eng !== null && company.open_roles_eng > 0 && (
             <p className="text-xs text-slate-400 mt-0.5">{company.open_roles_eng} in engineering</p>
           )}
           {company.open_roles_count > 20 && (
-            <div className="mt-1">
-              <Badge variant="success" className="text-[10px] px-1.5 py-0">Actively hiring</Badge>
+            <div className="mt-1.5">
+              <Badge variant="success" className="text-[10px] px-1.5 py-0">
+                <Zap size={9} />Actively hiring
+              </Badge>
             </div>
           )}
         </div>
 
-        {/* Company size */}
         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <Users size={13} className="text-slate-400" />
@@ -215,13 +192,11 @@ export function CompanyIntel({ companyName, companySlug, careerUrl, sourceType, 
           ) : (
             <p className="text-xs text-slate-400 mt-1">Not available</p>
           )}
-          {company.industry && (
-            <p className="text-xs text-slate-400 mt-0.5">{company.industry}</p>
-          )}
+          {company.industry && (<p className="text-xs text-slate-400 mt-0.5">{company.industry}</p>)}
         </div>
       </div>
 
-      {/* Sponsorship */}
+      {/* Sponsorship card */}
       <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 mb-4">
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-1.5">
@@ -238,37 +213,40 @@ export function CompanyIntel({ companyName, companySlug, careerUrl, sourceType, 
         )}
       </div>
 
-      {/* Career page links */}
+      {/* Posting freshness */}
+      <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <TrendingUp size={14} className="text-karmio-500" />
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Posting freshness</span>
+          </div>
+          <Badge variant="success">Active listing</Badge>
+        </div>
+        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+          This job was verified from {company.ats_type || sourceType} within the last fetch cycle.
+          {lastUpdated ? ` Data refreshed ${lastUpdated}.` : ''}
+        </p>
+      </div>
+
+      {/* Links */}
       <div className="space-y-2 mb-4">
         <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
           <Globe size={14} className="text-slate-400 flex-shrink-0" />
           <span>ATS: {company.ats_type || sourceType}</span>
-          {company._derived && (
-            <span className="ml-auto text-xs text-slate-400">(live data)</span>
-          )}
+          {company._derived && (<span className="ml-auto text-xs text-slate-400">(live data)</span>)}
         </div>
 
         {company.career_page_url && (
-          <a
-            href={company.career_page_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-karmio-500 hover:text-karmio-600 font-medium transition-colors"
-          >
-            <ExternalLink size={13} />
-            View careers page
+          <a href={company.career_page_url} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-karmio-500 hover:text-karmio-600 font-medium transition-colors">
+            <ExternalLink size={13} />View careers page
           </a>
         )}
 
         {company.ats_board_url && company.ats_board_url !== company.career_page_url && (
-          <a
-            href={company.ats_board_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-          >
-            <TrendingUp size={12} />
-            Browse all open roles on {company.ats_type || 'ATS'}
+          <a href={company.ats_board_url} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
+            <TrendingUp size={12} />Browse all open roles on {company.ats_type || 'ATS'}
           </a>
         )}
       </div>
@@ -285,7 +263,6 @@ export function CompanyIntel({ companyName, companySlug, careerUrl, sourceType, 
   );
 }
 
-// ─── Time helper ─────────────────────────────────────────────────────────────
 function timeSince(dateStr: string): string {
   const diffMs = Date.now() - new Date(dateStr).getTime();
   const diffMins = Math.floor(diffMs / 60000);

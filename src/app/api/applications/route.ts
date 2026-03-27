@@ -33,18 +33,15 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ success: false, error: { code: 'AUTH_REQUIRED', message: 'Please sign in.' } }, { status: 401 });
 
-    // Get user tier and weekly usage — handle gracefully if rpc/table missing
     const { data: profile } = await supabase.from('users').select('subscription_tier').eq('id', user.id).single();
     let usage = null;
     try {
       const { data: usageData } = await supabase.rpc('get_weekly_usage', { p_user_id: user.id });
       usage = usageData;
-    } catch {
-      // RPC might not exist yet — skip tier gating
-    }
+    } catch {}
 
     const tier = (profile?.subscription_tier || 'free') as SubscriptionTier;
-    
+
     if (usage) {
       const gate = checkTierAccess(tier, 'apply', usage);
       if (!gate.allowed) {
@@ -67,11 +64,9 @@ export async function POST(req: NextRequest) {
     }
     const { job_id, target_profile_id, match_score, status = 'applied' } = validation.data;
 
-    // Rate limit: apply
     const blocked = await applyRateLimit(user.id, tier, 'apply');
     if (blocked) return blocked;
 
-    // Check for duplicate application
     const { data: existing } = await supabase
       .from('applications')
       .select('id')
@@ -100,14 +95,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: { code: 'INSERT_FAILED', message: 'Could not create application. Please try again.' } }, { status: 500 });
     }
 
-    // Increment weekly usage — handle gracefully
     try {
       await supabase.rpc('increment_usage', { p_user_id: user.id, p_field: 'applications_count' });
-    } catch {
-      // RPC may not exist yet
-    }
+    } catch {}
 
-    // Create follow-up reminders if status is 'applied'
+    // Create follow-up reminders + outreach suggestions if applied
     if (status === 'applied') {
       try {
         const followUps = [3, 7, 14, 21].map(days => ({
@@ -118,9 +110,17 @@ export async function POST(req: NextRequest) {
           day_number: days,
         }));
         await supabase.from('follow_ups').insert(followUps);
-      } catch {
-        // follow_ups table may not exist yet
-      }
+      } catch {}
+
+      // Auto-generate outreach suggestions
+      try {
+        const origin = req.nextUrl.origin;
+        await fetch(`${origin}/api/network/suggest`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Cookie': req.headers.get('cookie') || '' },
+          body: JSON.stringify({ application_id: application.id, job_id: job_id }),
+        });
+      } catch {}
     }
 
     return NextResponse.json({ success: true, data: application }, { status: 201 });

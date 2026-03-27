@@ -9,7 +9,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { useAuth } from '@/hooks/useAuth';
 import { fetchAPI } from '@/hooks/useJobs';
-import { LogOut, Shield, Globe, Bell, Trash2, FileText, Clock, AlertTriangle } from 'lucide-react';
+import {
+  Globe, Bell, Trash2, FileText, Clock, AlertTriangle,
+  User, ArrowRight, Settings as SettingsIcon,
+} from 'lucide-react';
+import Link from 'next/link';
 
 export default function SettingsPage() {
   const { user, signOut, refreshUser } = useAuth();
@@ -19,7 +23,7 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
 
-  const [country, setCountry] = useState<'US' | 'IN'>(user?.country || 'US');
+  const [country, setCountry] = useState(user?.country || 'US');
   const [emailDigest, setEmailDigest] = useState<string>('daily');
   const [jobAlertFreq, setJobAlertFreq] = useState<string>('daily');
   const [defaultFormat, setDefaultFormat] = useState<string>('docx');
@@ -40,9 +44,9 @@ export default function SettingsPage() {
     setSaving(false);
   };
 
-  const updateCountry = (newCountry: string) => { setCountry(newCountry as 'US' | 'IN'); saveSettings({ country: newCountry }); };
+  const updateCountry = (newCountry: string) => { setCountry(newCountry); saveSettings({ country: newCountry }); };
 
-  const saveNotificationSettings = () => {
+  const savePreferences = () => {
     saveSettings({ _settings: { email_digest: emailDigest, job_alert_frequency: jobAlertFreq, default_resume_format: defaultFormat, default_page_count: defaultPageCount, timezone } });
   };
 
@@ -57,30 +61,48 @@ export default function SettingsPage() {
     setDeleting(false);
   };
 
-  const tier = user?.subscription_tier || 'free';
-
   return (
     <AppShell>
       <div className="max-w-2xl">
-        <h1 className="text-lg font-medium text-slate-900 dark:text-white mb-6">Settings</h1>
+        <div className="flex items-center gap-2 mb-6">
+          <SettingsIcon size={18} className="text-slate-400" />
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Settings</h1>
+        </div>
 
-        {/* Account */}
-        <Card padding="lg" className="mb-4">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-white flex items-center gap-2 mb-4"><Shield size={16} className="text-slate-400" /> Account</h2>
-          <div className="space-y-0">
-            <SettingsRow label="Email" value={user?.email || 'Not set'} />
-            <SettingsRow label="Name" value={user?.full_name || 'Not set'} />
-            <SettingsRow label="Subscription" value={<span className="flex items-center gap-2">{tier.charAt(0).toUpperCase() + tier.slice(1)} plan <Badge variant={tier === 'pro' ? 'success' : tier === 'popular' ? 'info' : 'default'}>{tier}</Badge></span>} />
-            <SettingsRow label="Member since" value={user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Unknown'} noBorder />
-          </div>
-        </Card>
+        {/* Profile link card */}
+        <Link href="/dashboard/profile">
+          <Card padding="lg" className="mb-4 hover:border-karmio-300 dark:hover:border-karmio-700 transition-colors cursor-pointer group">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-karmio-100 dark:bg-karmio-900/50 flex items-center justify-center text-sm font-semibold text-karmio-700 dark:text-karmio-300">
+                {user?.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-800 dark:text-white">{user?.full_name || 'Your Name'}</p>
+                <p className="text-xs text-slate-400">{user?.email} · {user?.subscription_tier || 'free'} plan</p>
+              </div>
+              <ArrowRight size={16} className="text-slate-300 group-hover:text-karmio-500 transition-colors" />
+            </div>
+          </Card>
+        </Link>
 
         {/* Region */}
         <Card padding="lg" className="mb-4">
           <h2 className="text-sm font-medium text-slate-900 dark:text-white flex items-center gap-2 mb-3"><Globe size={16} className="text-slate-400" /> Region</h2>
           <p className="text-xs text-slate-500 mb-3">Controls job sources, salary formats, visa questions, and payment currency.</p>
           <div className="max-w-xs">
-            <Select label="Country" value={country} onChange={(e) => updateCountry(e.target.value)} options={[{ value: 'US', label: '🇺🇸 United States' }, { value: 'IN', label: '🇮🇳 India' }]} />
+            <Select label="Country" value={country} onChange={(e) => updateCountry(e.target.value)}
+              options={[
+                { value: 'US', label: '🇺🇸 United States' },
+                { value: 'IN', label: '🇮🇳 India' },
+                { value: 'GB', label: '🇬🇧 United Kingdom' },
+                { value: 'CA', label: '🇨🇦 Canada' },
+                { value: 'DE', label: '🇩🇪 Germany' },
+                { value: 'AU', label: '🇦🇺 Australia' },
+                { value: 'SG', label: '🇸🇬 Singapore' },
+                { value: 'FR', label: '🇫🇷 France' },
+                { value: 'NL', label: '🇳🇱 Netherlands' },
+                { value: 'IE', label: '🇮🇪 Ireland' },
+              ]} />
           </div>
         </Card>
 
@@ -111,20 +133,13 @@ export default function SettingsPage() {
         </Card>
 
         <div className="flex justify-end mb-6">
-          <Button variant="primary" onClick={saveNotificationSettings} loading={saving}>Save preferences</Button>
+          <Button variant="primary" onClick={savePreferences} loading={saving}>Save preferences</Button>
         </div>
-
-        {/* Sign out */}
-        <Card padding="lg" className="mb-4">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-white flex items-center gap-2 mb-3"><LogOut size={16} className="text-slate-400" /> Session</h2>
-          <p className="text-xs text-slate-500 mb-3">Sign out of your Karmio account on this device.</p>
-          <Button variant="secondary" onClick={signOut}><LogOut size={14} /> Sign out</Button>
-        </Card>
 
         {/* Danger zone */}
         <Card padding="lg" className="mb-4 border-red-200 dark:border-red-800/50">
           <h2 className="text-sm font-medium text-red-700 dark:text-red-400 flex items-center gap-2 mb-3"><Trash2 size={16} /> Danger zone</h2>
-          <p className="text-xs text-slate-500 mb-3">Permanently delete your Karmio account and all associated data. This action cannot be undone. Your data will be fully removed within 30 days.</p>
+          <p className="text-xs text-slate-500 mb-3">Permanently delete your Karmio account and all associated data. This action cannot be undone.</p>
           <Button variant="danger" size="sm" onClick={() => setShowDeleteModal(true)}><Trash2 size={14} /> Delete my account</Button>
         </Card>
 
@@ -134,7 +149,7 @@ export default function SettingsPage() {
               <AlertTriangle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-red-700 dark:text-red-300 mb-1">This is permanent</p>
-                <p className="text-xs text-red-600 dark:text-red-400 leading-relaxed">All your profile data, resumes, applications, contacts, and messages will be permanently deleted within 30 days. This action cannot be reversed.</p>
+                <p className="text-xs text-red-600 dark:text-red-400 leading-relaxed">All your data will be permanently deleted within 30 days. This cannot be reversed.</p>
               </div>
             </div>
             <div>
@@ -152,14 +167,5 @@ export default function SettingsPage() {
         {toast && <div className="fixed bottom-6 right-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg z-50 animate-fade-in">{toast}</div>}
       </div>
     </AppShell>
-  );
-}
-
-function SettingsRow({ label, value, noBorder }: { label: string; value: React.ReactNode; noBorder?: boolean }) {
-  return (
-    <div className={`flex justify-between items-center py-3 ${noBorder ? '' : 'border-b border-slate-100 dark:border-slate-800'}`}>
-      <p className="text-xs text-slate-400">{label}</p>
-      <div className="text-sm text-slate-700 dark:text-slate-200">{value}</div>
-    </div>
   );
 }

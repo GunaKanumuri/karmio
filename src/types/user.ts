@@ -1,6 +1,12 @@
 export type SubscriptionTier = 'free' | 'popular' | 'pro';
 export type VisaStatus = 'opt' | 'stem_opt' | 'h1b' | 'green_card' | 'citizen' | 'other' | null;
-export type Country = 'US' | 'IN';
+
+// ISO 3166-1 alpha-2 country codes — no longer locked to US/IN
+export type Country = string;
+
+// Known supported countries with full locale configs
+export const SUPPORTED_COUNTRIES = ['US', 'IN', 'GB', 'CA', 'DE', 'AU', 'SG', 'NL', 'IE', 'FR'] as const;
+export type SupportedCountry = typeof SUPPORTED_COUNTRIES[number];
 
 export interface IUser {
   id: string;
@@ -14,12 +20,12 @@ export interface IUser {
   country: Country;
   current_location: string | null;
   target_locations: string[];
+  target_countries: string[];
   subscription_tier: SubscriptionTier;
   stripe_customer_id: string | null;
   onboarding_complete: boolean;
   created_at: string;
   updated_at: string;
-  // Joined via API
   target_profiles?: ITargetProfile[];
   weekly_usage?: any;
 }

@@ -24,6 +24,8 @@ interface Project {
   github_link: string | null;
   match_score: number;
   selected: boolean;
+  fit_category?: 'best_fit' | 'close_fit' | 'low_fit';
+  reason?: string;
 }
 
 interface Education {
@@ -76,45 +78,92 @@ function ResumeEditorContent() {
     skills: [],
   });
 
-  // Fetch user profile and job data
+  // Fetch user profile and job data — uses REAL profile API data
   useEffect(() => {
     if (!user) return;
 
     const fetchData = async () => {
       setLoading(true);
 
-      // Fetch user profile
-      const [profileRes, expRes, projRes, eduRes, skillsRes] = await Promise.all([
-        fetch('/api/profile'),
-        fetch('/api/profile?include=experiences'),
-        fetch('/api/profile?include=projects'),
-        fetch('/api/profile?include=education'),
-        fetch('/api/profile?include=skills'),
-      ]);
+      // Single API call — profile endpoint returns experiences, projects, education, skills
+      const profileRes = await fetch('/api/profile');
+      const profileJson = await profileRes.json();
+      const p = profileJson.data;
 
-      const profile = await profileRes.json();
-      
-      // For now, use mock data until profile includes these
-      setResumeData({
-        name: profile.data?.full_name || user.email?.split('@')[0] || '',
-        email: user.email || '',
-        phone: profile.data?.phone || '',
-        linkedin: profile.data?.linkedin_url || '',
-        github: profile.data?.github_url || '',
-        portfolio: profile.data?.portfolio_url || '',
-        summary: '',
-        experiences: getMockExperiences(),
-        projects: getMockProjects(),
-        education: getMockEducation(),
-        skills: getMockSkills(),
-      });
+      if (p) {
+        setResumeData({
+          name: p.full_name || user.email?.split('@')[0] || '',
+          email: user.email || '',
+          phone: p.phone || '',
+          linkedin: p.linkedin_url || '',
+          github: p.github_url || '',
+          portfolio: p.portfolio_url || '',
+          summary: '',
+          experiences: (p.experiences || []).map((exp: any) => ({
+            id: exp.id,
+            company: exp.company,
+            title: exp.title,
+            start_date: exp.start_date,
+            end_date: exp.end_date,
+            bullets: exp.bullets || [],
+            is_current: exp.is_current,
+            selected: true,
+          })),
+          projects: (p.projects || []).map((proj: any) => ({
+            id: proj.id,
+            title: proj.title,
+            description: proj.description || '',
+            technologies: proj.technologies || [],
+            github_link: proj.github_link,
+            match_score: 0,
+            selected: false,
+          })),
+          education: (p.education || []).map((edu: any) => ({
+            id: edu.id,
+            institution: edu.institution,
+            degree: edu.degree,
+            field: edu.field || '',
+            graduation_date: edu.graduation_date,
+            gpa: edu.gpa,
+          })),
+          skills: (p.skills || []).map((s: any) => typeof s === 'string' ? s : s.skill_name),
+        });
+      }
 
-      // Fetch job if provided
+      // Fetch job if provided — score projects against JD
       if (jobId) {
-        const jobRes = await fetch(`/api/jobs?id=${jobId}`);
+        const jobRes = await fetch(`/api/jobs/${jobId}`);
         const jobJson = await jobRes.json();
-        if (jobJson.success && jobJson.data?.[0]) {
-          setJob(jobJson.data[0]);
+        if (jobJson.success && jobJson.data) {
+          setJob(jobJson.data);
+
+          // Score projects against JD using project-scorer
+          if (jobJson.data.description_parsed && p?.projects?.length > 0) {
+            try {
+              const { scoreProjects, getRecommendedProjects } = await import('@/lib/matching/project-scorer');
+              const careerStage = p.target_profiles?.[0]?.career_stage;
+              const scored = scoreProjects(p.projects, jobJson.data.description_parsed, careerStage);
+              const { selected } = getRecommendedProjects(scored, careerStage);
+              const selectedIds = new Set(selected.map((s: any) => s.id));
+
+              setResumeData(prev => ({
+                ...prev,
+                projects: scored.map((sp: any) => ({
+                  id: sp.id,
+                  title: sp.title,
+                  description: sp.description || '',
+                  technologies: sp.technologies || [],
+                  github_link: sp.github_link,
+                  match_score: sp.relevance_score,
+                  selected: selectedIds.has(sp.id),
+                  fit_category: sp.fit_category,
+                  reason: sp.reason,
+                })),
+              }));
+            } catch (err) {
+              console.error('Project scoring error:', err);
+            }
+          }
         }
       }
 
@@ -144,11 +193,11 @@ function ResumeEditorContent() {
           ...prev,
           summary: json.data.enhanced_summary || prev.summary,
         }));
-        // Score and sort projects
+        // Re-score projects with matched keywords
         if (json.data.keywords_matched) {
           setResumeData(prev => ({
             ...prev,
-            projects: scoreProjects(prev.projects, json.data.keywords_matched),
+            projects: scoreProjectsByKeywords(prev.projects, json.data.keywords_matched),
           }));
         }
       }
@@ -159,18 +208,16 @@ function ResumeEditorContent() {
     setGenerating(false);
   };
 
-  // Score projects based on keyword match
-  const scoreProjects = (projects: Project[], keywords: string[]): Project[] => {
+  // Score projects by keyword match (lightweight fallback when full JD parsing isn't available)
+  const scoreProjectsByKeywords = (projects: Project[], keywords: string[]): Project[] => {
     return projects.map(p => {
       let score = 0;
       const techLower = p.technologies.map(t => t.toLowerCase());
       const descLower = (p.description || '').toLowerCase();
-      
       keywords.forEach(kw => {
         if (techLower.some(t => t.includes(kw.toLowerCase()))) score += 20;
         if (descLower.includes(kw.toLowerCase())) score += 10;
       });
-
       return { ...p, match_score: Math.min(100, score) };
     }).sort((a, b) => b.match_score - a.match_score);
   };
@@ -612,6 +659,13 @@ function ExperienceSection({ experiences, onToggle, onUpdateBullet, aiResult }: 
       <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-2">Experience</h3>
       <p className="text-sm text-surface-500 mb-4">Select experiences to include and edit bullet points.</p>
 
+      {experiences.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-surface-500 text-sm">No experiences found.</p>
+          <p className="text-surface-400 text-xs mt-1">Add experiences in your profile, or upload a resume during onboarding.</p>
+        </div>
+      )}
+
       {experiences.map((exp) => (
         <div 
           key={exp.id} 
@@ -678,8 +732,13 @@ function ProjectsSection({ projects, onToggle, maxSelect }: {
   maxSelect: number;
 }) {
   const selectedCount = projects.filter(p => p.selected).length;
-  const topMatches = projects.slice(0, 3);
-  const alternatives = projects.slice(3, 5);
+  
+  // Split into best fit and alternatives based on fit_category or score
+  const bestFit = projects.filter(p => p.fit_category === 'best_fit' || (!p.fit_category && p.match_score >= 40));
+  const closeFit = projects.filter(p => p.fit_category === 'close_fit' || (!p.fit_category && p.match_score >= 20 && p.match_score < 40));
+  const remaining = projects.filter(p => 
+    p.fit_category === 'low_fit' || (!p.fit_category && p.match_score < 20)
+  );
 
   return (
     <div className="space-y-4">
@@ -689,19 +748,44 @@ function ProjectsSection({ projects, onToggle, maxSelect }: {
       </div>
       <p className="text-sm text-surface-500">AI picked top matches. Select up to {maxSelect} projects.</p>
 
-      {/* Top Matches */}
-      <div className="space-y-3">
-        <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Best matches</p>
-        {topMatches.map((proj) => (
-          <ProjectCard key={proj.id} project={proj} onToggle={onToggle} disabled={!proj.selected && selectedCount >= maxSelect} />
-        ))}
-      </div>
+      {projects.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-surface-500 text-sm">No projects found.</p>
+          <p className="text-surface-400 text-xs mt-1">Add projects in your profile to include them in tailored resumes.</p>
+        </div>
+      )}
 
-      {/* Alternatives */}
-      {alternatives.length > 0 && (
+      {/* Best Fit */}
+      {bestFit.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+            Best fit ({bestFit.length})
+          </p>
+          {bestFit.map((proj) => (
+            <ProjectCard key={proj.id} project={proj} onToggle={onToggle} disabled={!proj.selected && selectedCount >= maxSelect} />
+          ))}
+        </div>
+      )}
+
+      {/* Close Fit */}
+      {closeFit.length > 0 && (
         <div className="space-y-3 pt-4 border-t border-surface-200 dark:border-surface-700">
-          <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Alternatives (swap in)</p>
-          {alternatives.map((proj) => (
+          <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+            Close fit — swap in ({closeFit.length})
+          </p>
+          {closeFit.map((proj) => (
+            <ProjectCard key={proj.id} project={proj} onToggle={onToggle} disabled={!proj.selected && selectedCount >= maxSelect} />
+          ))}
+        </div>
+      )}
+
+      {/* Low Fit */}
+      {remaining.length > 0 && (
+        <div className="space-y-3 pt-4 border-t border-surface-200 dark:border-surface-700">
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wider">
+            Other projects ({remaining.length})
+          </p>
+          {remaining.map((proj) => (
             <ProjectCard key={proj.id} project={proj} onToggle={onToggle} disabled={!proj.selected && selectedCount >= maxSelect} />
           ))}
         </div>
@@ -735,14 +819,19 @@ function ProjectCard({ project, onToggle, disabled }: { project: Project; onTogg
             <h4 className="font-medium text-surface-900 dark:text-white">{project.title}</h4>
             {project.match_score > 0 && (
               <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                project.match_score >= 50 
+                project.match_score >= 40 
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                  : project.match_score >= 20
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                   : 'bg-surface-100 text-surface-500 dark:bg-surface-800'
               }`}>
                 {project.match_score}% match
               </span>
             )}
           </div>
+          {project.reason && (
+            <p className="text-xs text-karmio-500 mt-0.5">{project.reason}</p>
+          )}
           <p className="text-sm text-surface-500 mt-1 line-clamp-2">{project.description}</p>
           <div className="flex flex-wrap gap-1 mt-2">
             {project.technologies.slice(0, 4).map((tech, i) => (
@@ -762,6 +851,13 @@ function EducationSection({ education }: { education: Education[] }) {
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-4">Education</h3>
       
+      {education.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-surface-500 text-sm">No education entries found.</p>
+          <p className="text-surface-400 text-xs mt-1">Add education in your profile settings.</p>
+        </div>
+      )}
+
       {education.map((edu) => (
         <div key={edu.id} className="p-4 rounded-xl border border-surface-200 dark:border-surface-700">
           <h4 className="font-medium text-surface-900 dark:text-white">{edu.degree} in {edu.field}</h4>
@@ -797,6 +893,10 @@ function SkillsSection({ skills, matchedKeywords, missingKeywords, onChange }: {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-surface-900 dark:text-white">Skills</h3>
+
+      {skills.length === 0 && (
+        <p className="text-surface-500 text-sm">No skills found. Add them below or upload a resume to auto-detect.</p>
+      )}
 
       {/* Current skills */}
       <div className="flex flex-wrap gap-2">
@@ -856,78 +956,10 @@ function SkillsSection({ skills, matchedKeywords, missingKeywords, onChange }: {
   );
 }
 
-// Utility functions
+// Utility
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '';
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-}
-
-// Mock data functions (replace with actual API calls)
-function getMockExperiences(): Experience[] {
-  return [
-    {
-      id: '1',
-      company: 'TechCorp Inc.',
-      title: 'Senior Software Engineer',
-      start_date: '2022-03-01',
-      end_date: null,
-      is_current: true,
-      selected: true,
-      bullets: [
-        'Led development of microservices architecture serving 1M+ users',
-        'Reduced API response time by 40% through optimization',
-        'Mentored team of 4 junior developers'
-      ]
-    },
-    {
-      id: '2',
-      company: 'StartupXYZ',
-      title: 'Full Stack Developer',
-      start_date: '2020-06-01',
-      end_date: '2022-02-28',
-      is_current: false,
-      selected: true,
-      bullets: [
-        'Built React dashboard used by 500+ enterprise clients',
-        'Implemented CI/CD pipeline reducing deployment time by 60%',
-        'Developed REST APIs handling 100K requests/day'
-      ]
-    },
-    {
-      id: '3',
-      company: 'Agency Pro',
-      title: 'Junior Developer',
-      start_date: '2019-01-01',
-      end_date: '2020-05-31',
-      is_current: false,
-      selected: false,
-      bullets: [
-        'Created responsive websites for 20+ clients',
-        'Collaborated with design team on UI implementation'
-      ]
-    }
-  ];
-}
-
-function getMockProjects(): Project[] {
-  return [
-    { id: 'p1', title: 'E-commerce Platform', description: 'Full-stack e-commerce solution with React, Node.js, and PostgreSQL. Features include real-time inventory, payment processing, and admin dashboard.', technologies: ['React', 'Node.js', 'PostgreSQL', 'Stripe'], github_link: 'github.com/user/ecommerce', match_score: 85, selected: true },
-    { id: 'p2', title: 'ML Pipeline Tool', description: 'Automated machine learning pipeline for data preprocessing, model training, and deployment using Python and AWS.', technologies: ['Python', 'TensorFlow', 'AWS', 'Docker'], github_link: 'github.com/user/ml-pipeline', match_score: 70, selected: true },
-    { id: 'p3', title: 'Real-time Chat App', description: 'WebSocket-based chat application with React and Socket.io supporting 10K concurrent users.', technologies: ['React', 'Socket.io', 'Redis', 'MongoDB'], github_link: 'github.com/user/chat-app', match_score: 65, selected: true },
-    { id: 'p4', title: 'Portfolio Website', description: 'Personal portfolio built with Next.js and TailwindCSS featuring dynamic content.', technologies: ['Next.js', 'TailwindCSS', 'Vercel'], github_link: 'github.com/user/portfolio', match_score: 40, selected: false },
-    { id: 'p5', title: 'Task Manager API', description: 'RESTful API for task management with authentication and role-based access.', technologies: ['Express', 'MongoDB', 'JWT'], github_link: 'github.com/user/task-api', match_score: 55, selected: false },
-    { id: 'p6', title: 'Weather Dashboard', description: 'Weather tracking dashboard with data visualization and location-based alerts.', technologies: ['Vue.js', 'Chart.js', 'OpenWeather API'], github_link: null, match_score: 30, selected: false },
-  ];
-}
-
-function getMockEducation(): Education[] {
-  return [
-    { id: 'e1', institution: 'University of Technology', degree: 'B.S.', field: 'Computer Science', graduation_date: '2019-05-15', gpa: 3.8 }
-  ];
-}
-
-function getMockSkills(): string[] {
-  return ['JavaScript', 'TypeScript', 'React', 'Node.js', 'Python', 'PostgreSQL', 'MongoDB', 'AWS', 'Docker', 'Git'];
 }
 
 export default function ResumeBuilderPage() {
