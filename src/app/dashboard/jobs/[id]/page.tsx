@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { CompanyIntel } from '@/components/jobs/CompanyIntel';
@@ -11,8 +11,8 @@ import { getTimeSince } from '@/lib/geo/locale-config';
 import { ArrowLeft, ExternalLink, Bookmark, BookmarkCheck, Building2, MapPin, Clock, DollarSign, Users, Briefcase, CheckCircle2, AlertTriangle, Loader2, FileText, Share2 } from 'lucide-react';
 import type { IJobCardData } from '@/types';
 
-export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function JobDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
   const [job, setJob] = useState<IJobCardData | null>(null);
   const [loading, setLoading] = useState(true);

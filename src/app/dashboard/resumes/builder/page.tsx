@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { useAuth } from '@/hooks/useAuth';
+import { ResumeImporter } from '@/components/shared/ResumeImporter';
 
 interface Experience {
   id: string;
@@ -62,6 +63,7 @@ function ResumeEditorContent() {
   const [generating, setGenerating] = useState(false);
   const [activeSection, setActiveSection] = useState<'contact' | 'summary' | 'experience' | 'education' | 'skills' | 'projects'>('summary');
   const [aiResult, setAiResult] = useState<any>(null);
+  const [importKey, setImportKey] = useState(0);
 
   // Resume data state
   const [resumeData, setResumeData] = useState<ResumeData>({
@@ -171,7 +173,7 @@ function ResumeEditorContent() {
     };
 
     fetchData();
-  }, [user, jobId]);
+  }, [user, jobId, importKey]);
 
   // Generate AI recommendations
   const handleGenerate = async () => {
@@ -227,7 +229,7 @@ function ResumeEditorContent() {
     setResumeData(prev => {
       const selectedCount = prev.projects.filter(p => p.selected).length;
       const project = prev.projects.find(p => p.id === projectId);
-      
+
       // Allow max 3 selected
       if (!project?.selected && selectedCount >= 3) {
         return prev;
@@ -303,6 +305,14 @@ function ResumeEditorContent() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Import Resume button */}
+            <ResumeImporter
+              variant="button"
+              buttonLabel="Import Resume"
+              onImportComplete={async () => {
+                setImportKey(k => k + 1);
+              }}
+            />
             {job && !aiResult && (
               <button
                 onClick={handleGenerate}
@@ -396,14 +406,14 @@ function ResumeEditorContent() {
                 <ContactSection data={resumeData} onChange={updateField} />
               )}
               {activeSection === 'summary' && (
-                <SummarySection 
-                  summary={resumeData.summary} 
+                <SummarySection
+                  summary={resumeData.summary}
                   aiSummary={aiResult?.enhanced_summary}
-                  onChange={(v) => updateField('summary', v)} 
+                  onChange={(v: string) => updateField('summary', v)}
                 />
               )}
               {activeSection === 'experience' && (
-                <ExperienceSection 
+                <ExperienceSection
                   experiences={resumeData.experiences}
                   onToggle={toggleExperience}
                   onUpdateBullet={updateBullet}
@@ -411,7 +421,7 @@ function ResumeEditorContent() {
                 />
               )}
               {activeSection === 'projects' && (
-                <ProjectsSection 
+                <ProjectsSection
                   projects={resumeData.projects}
                   onToggle={toggleProject}
                   maxSelect={3}
@@ -421,11 +431,11 @@ function ResumeEditorContent() {
                 <EducationSection education={resumeData.education} />
               )}
               {activeSection === 'skills' && (
-                <SkillsSection 
+                <SkillsSection
                   skills={resumeData.skills}
                   matchedKeywords={aiResult?.keywords_matched || []}
                   missingKeywords={aiResult?.keywords_missing || []}
-                  onChange={(v) => updateField('skills', v)}
+                  onChange={(v: string[]) => updateField('skills', v)}
                 />
               )}
             </div>
@@ -437,8 +447,8 @@ function ResumeEditorContent() {
 }
 
 // Resume Preview Component
-function ResumePreview({ data, selectedProjects, selectedExperiences }: { 
-  data: ResumeData; 
+function ResumePreview({ data, selectedProjects, selectedExperiences }: {
+  data: ResumeData;
   selectedProjects: Project[];
   selectedExperiences: Experience[];
 }) {
@@ -546,7 +556,7 @@ function ContactSection({ data, onChange }: { data: ResumeData; onChange: (field
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-4">Contact Information</h3>
-      
+
       <div>
         <label className="input-label">Full Name</label>
         <input
@@ -557,7 +567,7 @@ function ContactSection({ data, onChange }: { data: ResumeData; onChange: (field
           placeholder="Jane Doe"
         />
       </div>
-      
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="input-label">Email</label>
@@ -631,14 +641,14 @@ function SummarySection({ summary, aiSummary, onChange }: { summary: string; aiS
           </button>
         )}
       </div>
-      
+
       <textarea
         value={summary}
         onChange={e => onChange(e.target.value)}
         className="input-field min-h-[120px] resize-none"
         placeholder="Write a brief professional summary highlighting your key strengths and career goals..."
       />
-      
+
       <p className="text-xs text-surface-500">
         Tip: Keep it to 2-3 sentences. Focus on your value proposition for this specific role.
       </p>
@@ -646,8 +656,8 @@ function SummarySection({ summary, aiSummary, onChange }: { summary: string; aiS
   );
 }
 
-function ExperienceSection({ experiences, onToggle, onUpdateBullet, aiResult }: { 
-  experiences: Experience[]; 
+function ExperienceSection({ experiences, onToggle, onUpdateBullet, aiResult }: {
+  experiences: Experience[];
   onToggle: (id: string) => void;
   onUpdateBullet: (expId: string, bulletIndex: number, value: string) => void;
   aiResult?: any;
@@ -662,20 +672,20 @@ function ExperienceSection({ experiences, onToggle, onUpdateBullet, aiResult }: 
       {experiences.length === 0 && (
         <div className="text-center py-8">
           <p className="text-surface-500 text-sm">No experiences found.</p>
-          <p className="text-surface-400 text-xs mt-1">Add experiences in your profile, or upload a resume during onboarding.</p>
+          <p className="text-surface-400 text-xs mt-1">Import your resume using the button above, or add experiences in your profile.</p>
         </div>
       )}
 
       {experiences.map((exp) => (
-        <div 
-          key={exp.id} 
+        <div
+          key={exp.id}
           className={`rounded-xl border transition-all ${
-            exp.selected 
-              ? 'border-karmio-300 dark:border-karmio-700 bg-karmio-50/50 dark:bg-karmio-900/10' 
+            exp.selected
+              ? 'border-karmio-300 dark:border-karmio-700 bg-karmio-50/50 dark:bg-karmio-900/10'
               : 'border-surface-200 dark:border-surface-700'
           }`}
         >
-          <div 
+          <div
             className="p-4 flex items-center gap-3 cursor-pointer"
             onClick={() => setExpandedId(expandedId === exp.id ? null : exp.id)}
           >
@@ -690,13 +700,13 @@ function ExperienceSection({ experiences, onToggle, onUpdateBullet, aiResult }: 
               <h4 className="font-medium text-surface-900 dark:text-white">{exp.title}</h4>
               <p className="text-sm text-surface-500">{exp.company} • {formatDate(exp.start_date)} - {exp.is_current ? 'Present' : formatDate(exp.end_date)}</p>
             </div>
-            <svg 
-              width="20" 
-              height="20" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="1.5" 
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
               className={`text-surface-400 transition-transform ${expandedId === exp.id ? 'rotate-180' : ''}`}
             >
               <path d="M6 9l6 6 6-6" />
@@ -726,17 +736,17 @@ function ExperienceSection({ experiences, onToggle, onUpdateBullet, aiResult }: 
   );
 }
 
-function ProjectsSection({ projects, onToggle, maxSelect }: { 
-  projects: Project[]; 
+function ProjectsSection({ projects, onToggle, maxSelect }: {
+  projects: Project[];
   onToggle: (id: string) => void;
   maxSelect: number;
 }) {
   const selectedCount = projects.filter(p => p.selected).length;
-  
+
   // Split into best fit and alternatives based on fit_category or score
   const bestFit = projects.filter(p => p.fit_category === 'best_fit' || (!p.fit_category && p.match_score >= 40));
   const closeFit = projects.filter(p => p.fit_category === 'close_fit' || (!p.fit_category && p.match_score >= 20 && p.match_score < 40));
-  const remaining = projects.filter(p => 
+  const remaining = projects.filter(p =>
     p.fit_category === 'low_fit' || (!p.fit_category && p.match_score < 20)
   );
 
@@ -751,7 +761,7 @@ function ProjectsSection({ projects, onToggle, maxSelect }: {
       {projects.length === 0 && (
         <div className="text-center py-8">
           <p className="text-surface-500 text-sm">No projects found.</p>
-          <p className="text-surface-400 text-xs mt-1">Add projects in your profile to include them in tailored resumes.</p>
+          <p className="text-surface-400 text-xs mt-1">Import your resume or add projects in your profile to include them in tailored resumes.</p>
         </div>
       )}
 
@@ -796,12 +806,12 @@ function ProjectsSection({ projects, onToggle, maxSelect }: {
 
 function ProjectCard({ project, onToggle, disabled }: { project: Project; onToggle: (id: string) => void; disabled: boolean }) {
   return (
-    <div 
+    <div
       onClick={() => !disabled && onToggle(project.id)}
       className={`p-4 rounded-xl border cursor-pointer transition-all ${
-        project.selected 
-          ? 'border-karmio-300 dark:border-karmio-700 bg-karmio-50/50 dark:bg-karmio-900/10' 
-          : disabled 
+        project.selected
+          ? 'border-karmio-300 dark:border-karmio-700 bg-karmio-50/50 dark:bg-karmio-900/10'
+          : disabled
             ? 'border-surface-200 dark:border-surface-700 opacity-50 cursor-not-allowed'
             : 'border-surface-200 dark:border-surface-700 hover:border-surface-300 dark:hover:border-surface-600'
       }`}
@@ -819,7 +829,7 @@ function ProjectCard({ project, onToggle, disabled }: { project: Project; onTogg
             <h4 className="font-medium text-surface-900 dark:text-white">{project.title}</h4>
             {project.match_score > 0 && (
               <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                project.match_score >= 40 
+                project.match_score >= 40
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                   : project.match_score >= 20
                   ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
@@ -850,11 +860,11 @@ function EducationSection({ education }: { education: Education[] }) {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-4">Education</h3>
-      
+
       {education.length === 0 && (
         <div className="text-center py-8">
           <p className="text-surface-500 text-sm">No education entries found.</p>
-          <p className="text-surface-400 text-xs mt-1">Add education in your profile settings.</p>
+          <p className="text-surface-400 text-xs mt-1">Import your resume or add education in your profile.</p>
         </div>
       )}
 
@@ -871,8 +881,8 @@ function EducationSection({ education }: { education: Education[] }) {
   );
 }
 
-function SkillsSection({ skills, matchedKeywords, missingKeywords, onChange }: { 
-  skills: string[]; 
+function SkillsSection({ skills, matchedKeywords, missingKeywords, onChange }: {
+  skills: string[];
   matchedKeywords: string[];
   missingKeywords: string[];
   onChange: (skills: string[]) => void;
@@ -895,7 +905,7 @@ function SkillsSection({ skills, matchedKeywords, missingKeywords, onChange }: {
       <h3 className="text-lg font-semibold text-surface-900 dark:text-white">Skills</h3>
 
       {skills.length === 0 && (
-        <p className="text-surface-500 text-sm">No skills found. Add them below or upload a resume to auto-detect.</p>
+        <p className="text-surface-500 text-sm">No skills found. Import your resume or add them below.</p>
       )}
 
       {/* Current skills */}
@@ -903,10 +913,10 @@ function SkillsSection({ skills, matchedKeywords, missingKeywords, onChange }: {
         {skills.map((skill, i) => {
           const isMatched = matchedKeywords.some(kw => skill.toLowerCase().includes(kw.toLowerCase()));
           return (
-            <span 
-              key={i} 
+            <span
+              key={i}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 ${
-                isMatched 
+                isMatched
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                   : 'bg-surface-100 text-surface-700 dark:bg-surface-800 dark:text-surface-300'
               }`}

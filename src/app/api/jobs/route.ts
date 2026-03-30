@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
         )
       `, { count: 'exact' })
       .eq('is_active', true)
-      .in('country', country)
+      .eq('country', country)
       .eq('user_job_matches.user_id', user.id)
       .limit(limit);
 

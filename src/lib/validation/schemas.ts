@@ -94,7 +94,7 @@ export const updateProfileSchema = z.object({
       proficiency_level: z.number().min(1).max(5).optional(),
     }),
   ])).optional(),
-}).passthrough(); // Allow extra fields for forward compat
+}).strip(); // Silently drop unknown fields for safety
 
 // ─── Resume generation ───
 export const generateResumeSchema = z.object({
@@ -121,7 +121,7 @@ export const networkPostSchema = z.object({
   contact_title: z.string().max(100).optional(),
   role: z.string().max(100).optional(),
   tone: z.enum(['professional', 'casual', 'referral', 'technical']).optional(),
-}).passthrough();
+}).strip();
 
 // ─── Helper to validate and return typed errors ───
 export function validateInput<T>(schema: z.ZodSchema<T>, data: unknown): { success: true; data: T } | { success: false; error: string } {

@@ -41,12 +41,6 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       data: { message: 'If an account exists, a reset link has been sent.' },
-    }, {
-      headers: {
-        'X-RateLimit-Limit': '5',
-        'X-RateLimit-Remaining': '4',
-        'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 900),
-      },
     });
   } catch (err) {
     console.error('Forgot password error:', err);

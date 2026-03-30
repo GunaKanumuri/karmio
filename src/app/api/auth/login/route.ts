@@ -105,12 +105,6 @@ export async function POST(request: Request) {
                 user: profile,
                 redirect: profile?.onboarding_complete ? '/dashboard/home' : '/onboarding/location',
             },
-        }, {
-            headers: {
-                'X-RateLimit-Limit': '5',
-                'X-RateLimit-Remaining': '4',
-                'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 900),
-            },
         });
     } catch (err) {
         console.error('Login error:', err);

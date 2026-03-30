@@ -5,12 +5,16 @@ import { createServerSupabase } from '@/lib/supabase/server';
  * POST /api/profile/upload-resume/save
  * Takes parsed resume data and saves to DB tables:
  * - users (name, phone, linkedin, github, portfolio, location)
- * - experiences
- * - projects
- * - education
- * - skills
- * 
+ * - experiences (UPSERT — merges with existing, does NOT skip)
+ * - projects (UPSERT — merges with existing)
+ * - education (UPSERT — merges with existing)
+ * - skills (UPSERT — adds new, keeps existing)
+ *
  * Called after /api/profile/upload-resume parses the file.
+ *
+ * Optional query param: ?mode=merge (default) | replace
+ *   merge  = add new entries alongside existing ones
+ *   replace = delete existing entries first, then insert parsed ones
  */
 export async function POST(req: NextRequest) {
   try {
@@ -24,9 +28,10 @@ export async function POST(req: NextRequest) {
     }
 
     const parsed = await req.json();
+    const mode = new URL(req.url).searchParams.get('mode') || 'merge';
     const results = { profile: false, experiences: 0, projects: 0, education: 0, skills: 0 };
 
-    // 1. Update user profile
+    // 1. Update user profile fields (always upsert — latest resume wins for contact info)
     const profileFields: Record<string, any> = {};
     if (parsed.full_name) profileFields.full_name = parsed.full_name;
     if (parsed.phone) profileFields.phone = parsed.phone;
@@ -40,13 +45,26 @@ export async function POST(req: NextRequest) {
       if (!error) results.profile = true;
     }
 
-    // 2. Insert experiences (skip if user already has some)
+    // 2. Insert experiences (merge: dedupe by company+title, replace: clear first)
     if (parsed.experiences && parsed.experiences.length > 0) {
-      const { data: existing } = await supabase
-        .from('experiences').select('id').eq('user_id', user.id).limit(1);
+      if (mode === 'replace') {
+        await supabase.from('experiences').delete().eq('user_id', user.id);
+      }
 
-      if (!existing || existing.length === 0) {
-        const rows = parsed.experiences.map((exp: any) => ({
+      // Get existing to dedupe in merge mode
+      const { data: existing } = await supabase
+        .from('experiences').select('company, title').eq('user_id', user.id);
+      const existingKeys = new Set(
+        (existing || []).map((e: any) => `${(e.company || '').toLowerCase()}::${(e.title || '').toLowerCase()}`)
+      );
+
+      const newRows = parsed.experiences
+        .filter((exp: any) => {
+          if (mode === 'replace') return true;
+          const key = `${(exp.company || '').toLowerCase()}::${(exp.title || '').toLowerCase()}`;
+          return !existingKeys.has(key);
+        })
+        .map((exp: any) => ({
           user_id: user.id,
           company: exp.company || 'Unknown',
           title: exp.title || 'Unknown',
@@ -57,18 +75,30 @@ export async function POST(req: NextRequest) {
           is_current: exp.is_current || false,
         }));
 
-        const { data } = await supabase.from('experiences').insert(rows).select('id');
+      if (newRows.length > 0) {
+        const { data } = await supabase.from('experiences').insert(newRows).select('id');
         results.experiences = data?.length || 0;
       }
     }
 
-    // 3. Insert projects
+    // 3. Insert projects (merge: dedupe by title, replace: clear first)
     if (parsed.projects && parsed.projects.length > 0) {
-      const { data: existing } = await supabase
-        .from('projects').select('id').eq('user_id', user.id).limit(1);
+      if (mode === 'replace') {
+        await supabase.from('projects').delete().eq('user_id', user.id);
+      }
 
-      if (!existing || existing.length === 0) {
-        const rows = parsed.projects.map((proj: any) => ({
+      const { data: existing } = await supabase
+        .from('projects').select('title').eq('user_id', user.id);
+      const existingTitles = new Set(
+        (existing || []).map((p: any) => (p.title || '').toLowerCase())
+      );
+
+      const newRows = parsed.projects
+        .filter((proj: any) => {
+          if (mode === 'replace') return true;
+          return !existingTitles.has((proj.title || '').toLowerCase());
+        })
+        .map((proj: any) => ({
           user_id: user.id,
           title: proj.title || 'Untitled Project',
           description: proj.description || '',
@@ -79,18 +109,31 @@ export async function POST(req: NextRequest) {
           project_type: proj.project_type || 'personal',
         }));
 
-        const { data } = await supabase.from('projects').insert(rows).select('id');
+      if (newRows.length > 0) {
+        const { data } = await supabase.from('projects').insert(newRows).select('id');
         results.projects = data?.length || 0;
       }
     }
 
-    // 4. Insert education
+    // 4. Insert education (merge: dedupe by institution+degree, replace: clear first)
     if (parsed.education && parsed.education.length > 0) {
-      const { data: existing } = await supabase
-        .from('education').select('id').eq('user_id', user.id).limit(1);
+      if (mode === 'replace') {
+        await supabase.from('education').delete().eq('user_id', user.id);
+      }
 
-      if (!existing || existing.length === 0) {
-        const rows = parsed.education.map((edu: any) => ({
+      const { data: existing } = await supabase
+        .from('education').select('institution, degree').eq('user_id', user.id);
+      const existingKeys = new Set(
+        (existing || []).map((e: any) => `${(e.institution || '').toLowerCase()}::${(e.degree || '').toLowerCase()}`)
+      );
+
+      const newRows = parsed.education
+        .filter((edu: any) => {
+          if (mode === 'replace') return true;
+          const key = `${(edu.institution || '').toLowerCase()}::${(edu.degree || '').toLowerCase()}`;
+          return !existingKeys.has(key);
+        })
+        .map((edu: any) => ({
           user_id: user.id,
           institution: edu.institution || 'Unknown',
           degree: edu.degree || 'Unknown',
@@ -99,12 +142,13 @@ export async function POST(req: NextRequest) {
           gpa: edu.gpa || null,
         }));
 
-        const { data } = await supabase.from('education').insert(rows).select('id');
+      if (newRows.length > 0) {
+        const { data } = await supabase.from('education').insert(newRows).select('id');
         results.education = data?.length || 0;
       }
     }
 
-    // 5. Insert skills
+    // 5. Insert skills (always merge — upsert with ON CONFLICT)
     if (parsed.skills && parsed.skills.length > 0) {
       const rows = parsed.skills.map((skill: string) => ({
         user_id: user.id,
@@ -112,7 +156,6 @@ export async function POST(req: NextRequest) {
         skill_category: 'technical',
       }));
 
-      // Use ON CONFLICT to skip duplicates
       const { data } = await supabase
         .from('skills')
         .upsert(rows, { onConflict: 'user_id,skill_name', ignoreDuplicates: true })

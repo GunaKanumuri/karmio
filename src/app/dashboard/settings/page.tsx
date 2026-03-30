@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { fetchAPI } from '@/hooks/useJobs';
 import {
   Globe, Bell, Trash2, FileText, Clock, AlertTriangle,
-  User, ArrowRight, Settings as SettingsIcon,
+  User, ArrowRight, Settings as SettingsIcon, LogOut,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -74,7 +74,7 @@ export default function SettingsPage() {
           <Card padding="lg" className="mb-4 hover:border-karmio-300 dark:hover:border-karmio-700 transition-colors cursor-pointer group">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-karmio-100 dark:bg-karmio-900/50 flex items-center justify-center text-sm font-semibold text-karmio-700 dark:text-karmio-300">
-                {user?.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
+                {user?.full_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-slate-800 dark:text-white">{user?.full_name || 'Your Name'}</p>
@@ -135,6 +135,22 @@ export default function SettingsPage() {
         <div className="flex justify-end mb-6">
           <Button variant="primary" onClick={savePreferences} loading={saving}>Save preferences</Button>
         </div>
+
+        {/* Sign out */}
+        <Card padding="lg" className="mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <LogOut size={16} className="text-slate-400" />
+              <div>
+                <p className="text-sm font-medium text-slate-900 dark:text-white">Sign out</p>
+                <p className="text-xs text-slate-500">Sign out of your Karmio account on this device.</p>
+              </div>
+            </div>
+            <Button variant="secondary" size="sm" onClick={signOut}>
+              <LogOut size={14} /> Sign out
+            </Button>
+          </div>
+        </Card>
 
         {/* Danger zone */}
         <Card padding="lg" className="mb-4 border-red-200 dark:border-red-800/50">

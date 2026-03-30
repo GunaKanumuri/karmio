@@ -439,6 +439,11 @@ RETURNS void AS $$
 DECLARE
   v_week_start DATE := DATE_TRUNC('week', NOW())::DATE;
 BEGIN
+  -- Whitelist allowed field names to prevent injection via dynamic SQL
+  IF p_field NOT IN ('applications_count', 'resumes_generated', 'messages_generated', 'cover_letters_generated') THEN
+    RAISE EXCEPTION 'Invalid usage field: %', p_field;
+  END IF;
+
   INSERT INTO public.weekly_usage (user_id, week_start)
   VALUES (p_user_id, v_week_start)
   ON CONFLICT (user_id, week_start) DO NOTHING;

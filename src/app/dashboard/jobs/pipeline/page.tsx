@@ -16,7 +16,7 @@ import {
   ChevronRight, CheckCircle2, Clock, Briefcase, PhoneCall,
   Code2, Brain, Trophy, XCircle, ArrowRight, Sparkles,
   MoreHorizontal, FileText, ExternalLink, Users,
-  MessageSquare, GripVertical, AlertTriangle,
+  MessageSquare, GripVertical, AlertTriangle, BookOpen,
 } from 'lucide-react';
 
 // ─── Stage Configuration ─────────────────────────────────────────────────────
@@ -134,25 +134,42 @@ function PipelineCard({ app, outreach, onReject, onViewJob }: {
             <MoreHorizontal size={14} />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-5 z-20 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg py-1 text-xs">
-              <button className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
-                onClick={() => { setMenuOpen(false); onViewJob(app.job?.id); }}>
-                <ExternalLink size={11} className="inline mr-1.5" />View job
-              </button>
-              <button className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
-                onClick={() => { setMenuOpen(false); router.push(`/dashboard/resumes/builder?job=${app.job?.id}`); }}>
-                <FileText size={11} className="inline mr-1.5" />Tailor resume
-              </button>
-              <button className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
-                onClick={() => { setMenuOpen(false); router.push('/dashboard/network/contacts'); }}>
-                <Users size={11} className="inline mr-1.5" />Outreach
-              </button>
-              <hr className="my-1 border-slate-100 dark:border-slate-700" />
-              <button className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"
-                onClick={() => { setMenuOpen(false); onReject(app.id); }}>
-                <XCircle size={11} className="inline mr-1.5" />Reject
-              </button>
-            </div>
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-5 z-20 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg py-1 text-xs">
+                <button className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  onClick={() => { setMenuOpen(false); onViewJob(app.job?.id); }}>
+                  <ExternalLink size={11} className="inline mr-1.5" />View job
+                </button>
+                <button className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  onClick={() => { setMenuOpen(false); router.push(`/dashboard/resumes/builder?job=${app.job?.id}`); }}>
+                  <FileText size={11} className="inline mr-1.5" />Tailor resume
+                </button>
+                <button
+                  className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    const stageMap: Record<string, string> = {
+                      applied: 'hr', hr_screen: 'hr', technical: 'technical',
+                      behavioral: 'behavioral', final: 'behavioral', offer: 'offer',
+                    };
+                    const prepStage = stageMap[app.status] || 'hr';
+                    router.push(`/dashboard/prep?stage=${prepStage}&app=${app.id}`);
+                  }}
+                >
+                  <BookOpen size={11} className="inline mr-1.5" />Prep for this
+                </button>
+                <button className="w-full text-left px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  onClick={() => { setMenuOpen(false); router.push('/dashboard/network/contacts'); }}>
+                  <Users size={11} className="inline mr-1.5" />Outreach
+                </button>
+                <hr className="my-1 border-slate-100 dark:border-slate-700" />
+                <button className="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"
+                  onClick={() => { setMenuOpen(false); onReject(app.id); }}>
+                  <XCircle size={11} className="inline mr-1.5" />Reject
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>

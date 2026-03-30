@@ -71,9 +71,6 @@ export async function GET() {
     }, {
       headers: {
         'Cache-Control': 'private, max-age=300',
-        'X-RateLimit-Limit': '60',
-        'X-RateLimit-Remaining': '59',
-        'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 60),
       },
     });
   } catch (err) {

@@ -30,13 +30,21 @@ export async function POST(req: NextRequest) {
     let textContent = '';
 
     if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-      textContent = extractTextFromPDF(buffer);
+      textContent = await extractTextFromPDF(buffer);
     } else {
-      textContent = extractTextFromDOCX(buffer);
+      textContent = await extractTextFromDOCX(buffer);
     }
 
     if (!textContent || textContent.length < 50) {
+      // Last resort: try raw UTF-8 extraction
       textContent = buffer.toString('utf-8').replace(/[^\x20-\x7E\n\r\t]/g, ' ').replace(/\s+/g, ' ');
+    }
+
+    if (!textContent || textContent.length < 50) {
+      return NextResponse.json({
+        success: false,
+        error: { code: 'PDF_PARSE_FAILED', message: 'Could not extract text from this file. Try a different PDF or Word document.', retryable: true },
+      }, { status: 422 });
     }
 
     const parsed = await parseResumeContent(textContent);
@@ -51,10 +59,25 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function extractTextFromPDF(buffer: Buffer): string {
+// ─── PDF text extraction using pdf-parse ─────────────────────────────────────
+
+async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pdfModule = await import('pdf-parse') as any;
+    const parse = pdfModule.default || pdfModule;
+    const result = await parse(buffer);
+    return (result.text || '').trim();
+  } catch (err) {
+    console.error('pdf-parse failed, trying fallback:', err);
+    return extractTextFromPDFFallback(buffer);
+  }
+}
+
+function extractTextFromPDFFallback(buffer: Buffer): string {
   const content = buffer.toString('binary');
   const texts: string[] = [];
-  
+
   const btEtRegex = /BT\s*([\s\S]*?)\s*ET/g;
   let match;
   while ((match = btEtRegex.exec(content)) !== null) {
@@ -73,7 +96,7 @@ function extractTextFromPDF(buffer: Buffer): string {
       }
     }
   }
-  
+
   const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
   while ((match = streamRegex.exec(content)) !== null) {
     const cleaned = match[1].replace(/[^\x20-\x7E\n\r\t]/g, ' ').trim();
@@ -84,11 +107,14 @@ function extractTextFromPDF(buffer: Buffer): string {
       }
     }
   }
-  
+
   return texts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
-function extractTextFromDOCX(buffer: Buffer): string {
+// ─── DOCX text extraction using mammoth ──────────────────────────────────────
+
+async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
+  // Regex-based extraction — works for most DOCX files
   try {
     const content = buffer.toString('binary');
     const texts: string[] = [];
@@ -105,6 +131,26 @@ function extractTextFromDOCX(buffer: Buffer): string {
     return '';
   }
 }
+
+function extractTextFromDOCXFallback(buffer: Buffer): string {
+  try {
+    const content = buffer.toString('binary');
+    const texts: string[] = [];
+    const textRegex = /<w:t[^>]*>(.*?)<\/w:t>/g;
+    let match;
+    while ((match = textRegex.exec(content)) !== null) {
+      texts.push(match[1]);
+    }
+    if (texts.length === 0) {
+      return content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    }
+    return texts.join(' ');
+  } catch {
+    return '';
+  }
+}
+
+// ─── Resume parsing with Claude ──────────────────────────────────────────────
 
 interface ParsedResume {
   full_name: string;
@@ -125,7 +171,7 @@ interface ParsedResume {
 
 async function parseResumeContent(text: string): Promise<ParsedResume> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  
+
   if (apiKey && text.length > 100) {
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -156,7 +202,7 @@ Return this exact JSON structure:
   "education": [{"institution": "string", "degree": "string", "field": "string", "graduation_date": "YYYY-MM"}]
 }
 
-Use empty strings for missing fields. Parse dates as YYYY-MM format.`
+Use empty strings for missing fields. Parse dates as YYYY-MM format. Extract ALL experiences, projects, and education entries — do not skip any.`
           }],
         }),
       });
@@ -168,19 +214,17 @@ Use empty strings for missing fields. Parse dates as YYYY-MM format.`
 
       const data = await response.json();
       const responseText = data.content?.[0]?.text || '';
-      
+
       if (!responseText) {
         console.error('Empty response from Claude API');
         return ruleBasedParse(text);
       }
 
-      // Strip markdown fences and any surrounding whitespace/text
       const cleaned = responseText
         .replace(/```json\s*/g, '')
         .replace(/```\s*/g, '')
         .trim();
 
-      // Try to extract JSON object even if there's surrounding text
       const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         console.error('No JSON object found in Claude response:', cleaned.slice(0, 200));
@@ -188,13 +232,11 @@ Use empty strings for missing fields. Parse dates as YYYY-MM format.`
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
-      
-      // Validate that we got at least some meaningful data back
+
       if (!parsed || typeof parsed !== 'object') {
         return ruleBasedParse(text);
       }
 
-      // Normalize: ensure all expected fields exist
       return {
         full_name: parsed.full_name || '',
         email: parsed.email || '',

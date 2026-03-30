@@ -7,8 +7,9 @@ import { Input, Textarea, Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { WhyHelper, Skeleton } from '@/components/shared/Helpers';
+import { ResumeImporter } from '@/components/shared/ResumeImporter';
 import { useAuth } from '@/hooks/useAuth';
-import { Pencil, Plus, Trash2, Briefcase, GraduationCap, Code, FolderOpen, User } from 'lucide-react';
+import { Pencil, Plus, Trash2, Briefcase, GraduationCap, Code, FolderOpen, User, Upload } from 'lucide-react';
 
 interface ProfileData {
   id: string;
@@ -37,6 +38,7 @@ export default function MasterProfilePage() {
   const [saving, setSaving] = useState(false);
   const [editSection, setEditSection] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [showImporter, setShowImporter] = useState(false);
 
   // Form states
   const [personalForm, setPersonalForm] = useState<any>({});
@@ -92,8 +94,7 @@ export default function MasterProfilePage() {
 
   const deleteExperience = async (id: string) => {
     try {
-      // We'll use the profile API with a special delete flag
-      const res = await fetch('/api/profile', {
+      await fetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ _delete_experience: id }),
@@ -103,6 +104,14 @@ export default function MasterProfilePage() {
     } catch {
       showToast('Error removing experience');
     }
+  };
+
+  const handleImportComplete = async (_parsedData: any, _saveResults: any) => {
+    // Refresh profile data from DB after import
+    await fetchProfile();
+    refreshUser();
+    setShowImporter(false);
+    showToast('Resume imported successfully');
   };
 
   const openPersonalEdit = () => {
@@ -160,15 +169,38 @@ export default function MasterProfilePage() {
     setEditSection('project');
   };
 
+  // Check if profile is mostly empty (show import prominently)
+  const isProfileEmpty = !loading && profile && (
+    (profile.experiences || []).length === 0 &&
+    (profile.projects || []).length === 0 &&
+    (profile.education || []).length === 0
+  );
+
   return (
     <AppShell>
       <div className="max-w-4xl">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-lg font-medium text-slate-900 dark:text-white">Master profile</h1>
-            <p className="text-xs text-slate-500 mt-0.5">This is the source for all your tailored resumes</p>
+            <h1 className="text-lg font-medium text-slate-900 dark:text-white flex items-center gap-2">
+              <User size={18} className="text-slate-400" />
+              Profile
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">Your master profile powers resume tailoring and job matching.</p>
           </div>
+          <Button variant="secondary" size="sm" onClick={() => setShowImporter(!showImporter)}>
+            <Upload size={14} /> Import Resume
+          </Button>
         </div>
+
+        {/* Resume Importer — show when clicked or when profile is empty */}
+        {(showImporter || isProfileEmpty) && (
+          <div className="mb-6">
+            <ResumeImporter
+              mode="merge"
+              onImportComplete={handleImportComplete}
+            />
+          </div>
+        )}
 
         {loading ? (
           <div className="space-y-4">
@@ -266,7 +298,7 @@ export default function MasterProfilePage() {
                   ))}
                 </div>
               ) : (
-                <EmptyState message="No work experience added yet." action="Add your experience to enable AI resume tailoring." />
+                <EmptyState message="No work experience added yet." action="Import your resume above or add manually." />
               )}
             </Section>
 
@@ -352,14 +384,14 @@ export default function MasterProfilePage() {
         {/* Edit Personal Modal */}
         <Modal open={editSection === 'personal'} onClose={() => setEditSection(null)} title="Edit personal information" size="lg">
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Full name" value={personalForm.full_name || ''} onChange={e => setPersonalForm({ ...personalForm, full_name: e.target.value })} />
-            <Input label="Phone" value={personalForm.phone || ''} onChange={e => setPersonalForm({ ...personalForm, phone: e.target.value })} />
-            <Input label="LinkedIn URL" value={personalForm.linkedin_url || ''} onChange={e => setPersonalForm({ ...personalForm, linkedin_url: e.target.value })} />
-            <Input label="GitHub URL" value={personalForm.github_url || ''} onChange={e => setPersonalForm({ ...personalForm, github_url: e.target.value })} />
-            <Input label="Portfolio URL" value={personalForm.portfolio_url || ''} onChange={e => setPersonalForm({ ...personalForm, portfolio_url: e.target.value })} />
-            <Input label="Current location" value={personalForm.current_location || ''} onChange={e => setPersonalForm({ ...personalForm, current_location: e.target.value })} />
+            <Input label="Full name" value={personalForm.full_name || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPersonalForm({ ...personalForm, full_name: e.target.value })} />
+            <Input label="Phone" value={personalForm.phone || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPersonalForm({ ...personalForm, phone: e.target.value })} />
+            <Input label="LinkedIn URL" value={personalForm.linkedin_url || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPersonalForm({ ...personalForm, linkedin_url: e.target.value })} />
+            <Input label="GitHub URL" value={personalForm.github_url || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPersonalForm({ ...personalForm, github_url: e.target.value })} />
+            <Input label="Portfolio URL" value={personalForm.portfolio_url || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPersonalForm({ ...personalForm, portfolio_url: e.target.value })} />
+            <Input label="Current location" value={personalForm.current_location || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPersonalForm({ ...personalForm, current_location: e.target.value })} />
             {profile?.country === 'US' && (
-              <Select label="Visa status" value={personalForm.visa_status || ''} onChange={e => setPersonalForm({ ...personalForm, visa_status: e.target.value })}
+              <Select label="Visa status" value={personalForm.visa_status || ''} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPersonalForm({ ...personalForm, visa_status: e.target.value })}
                 options={[
                   { value: '', label: 'Select...' }, { value: 'citizen', label: 'US Citizen' },
                   { value: 'green_card', label: 'Green Card' }, { value: 'h1b', label: 'H-1B' },
@@ -368,7 +400,7 @@ export default function MasterProfilePage() {
                 ]} />
             )}
             <div className="col-span-2">
-              <Input label="Target locations (comma separated)" value={personalForm.target_locations || ''} onChange={e => setPersonalForm({ ...personalForm, target_locations: e.target.value })} />
+              <Input label="Target locations (comma separated)" value={personalForm.target_locations || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPersonalForm({ ...personalForm, target_locations: e.target.value })} />
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-6">
@@ -383,21 +415,21 @@ export default function MasterProfilePage() {
         {/* Edit Experience Modal */}
         <Modal open={editSection === 'experience'} onClose={() => setEditSection(null)} title={expForm.id ? 'Edit experience' : 'Add experience'} size="lg">
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Company" value={expForm.company || ''} onChange={e => setExpForm({ ...expForm, company: e.target.value })} required />
-            <Input label="Title" value={expForm.title || ''} onChange={e => setExpForm({ ...expForm, title: e.target.value })} required />
-            <Input label="Start date" type="month" value={expForm.start_date?.slice(0, 7) || ''} onChange={e => setExpForm({ ...expForm, start_date: e.target.value + '-01' })} />
+            <Input label="Company" value={expForm.company || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExpForm({ ...expForm, company: e.target.value })} required />
+            <Input label="Title" value={expForm.title || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExpForm({ ...expForm, title: e.target.value })} required />
+            <Input label="Start date" type="month" value={expForm.start_date?.slice(0, 7) || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExpForm({ ...expForm, start_date: e.target.value + '-01' })} />
             <div>
-              <Input label="End date" type="month" value={expForm.end_date?.slice(0, 7) || ''} onChange={e => setExpForm({ ...expForm, end_date: e.target.value + '-01' })} disabled={expForm.is_current} />
+              <Input label="End date" type="month" value={expForm.end_date?.slice(0, 7) || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExpForm({ ...expForm, end_date: e.target.value + '-01' })} disabled={expForm.is_current} />
               <label className="flex items-center gap-2 mt-1.5">
-                <input type="checkbox" checked={expForm.is_current || false} onChange={e => setExpForm({ ...expForm, is_current: e.target.checked, end_date: '' })} className="rounded" />
+                <input type="checkbox" checked={expForm.is_current || false} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExpForm({ ...expForm, is_current: e.target.checked, end_date: '' })} className="rounded" />
                 <span className="text-xs text-slate-500">Currently working here</span>
               </label>
             </div>
             <div className="col-span-2">
-              <Textarea label="Key achievements (one per line)" value={expForm.bullets || ''} rows={4} onChange={e => setExpForm({ ...expForm, bullets: e.target.value })} placeholder="Increased API throughput by 40%&#10;Led team of 4 engineers&#10;Built payment processing pipeline" />
+              <Textarea label="Key achievements (one per line)" value={expForm.bullets || ''} rows={4} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setExpForm({ ...expForm, bullets: e.target.value })} placeholder="Increased API throughput by 40%&#10;Led team of 4 engineers&#10;Built payment processing pipeline" />
             </div>
             <div className="col-span-2">
-              <Input label="Technologies (comma separated)" value={expForm.technologies || ''} onChange={e => setExpForm({ ...expForm, technologies: e.target.value })} placeholder="React, Node.js, PostgreSQL" />
+              <Input label="Technologies (comma separated)" value={expForm.technologies || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExpForm({ ...expForm, technologies: e.target.value })} placeholder="React, Node.js, PostgreSQL" />
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-6">
@@ -418,11 +450,11 @@ export default function MasterProfilePage() {
         {/* Edit Education Modal */}
         <Modal open={editSection === 'education'} onClose={() => setEditSection(null)} title={eduForm.id ? 'Edit education' : 'Add education'}>
           <div className="space-y-4">
-            <Input label="Institution" value={eduForm.institution || ''} onChange={e => setEduForm({ ...eduForm, institution: e.target.value })} required />
-            <Input label="Degree" value={eduForm.degree || ''} onChange={e => setEduForm({ ...eduForm, degree: e.target.value })} placeholder="B.S." required />
-            <Input label="Field of study" value={eduForm.field || ''} onChange={e => setEduForm({ ...eduForm, field: e.target.value })} placeholder="Computer Science" />
-            <Input label="Graduation date" type="month" value={eduForm.graduation_date?.slice(0, 7) || ''} onChange={e => setEduForm({ ...eduForm, graduation_date: e.target.value + '-01' })} />
-            <Input label="GPA (optional)" value={eduForm.gpa || ''} onChange={e => setEduForm({ ...eduForm, gpa: e.target.value })} placeholder="3.8" />
+            <Input label="Institution" value={eduForm.institution || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEduForm({ ...eduForm, institution: e.target.value })} required />
+            <Input label="Degree" value={eduForm.degree || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEduForm({ ...eduForm, degree: e.target.value })} placeholder="B.S." required />
+            <Input label="Field of study" value={eduForm.field || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEduForm({ ...eduForm, field: e.target.value })} placeholder="Computer Science" />
+            <Input label="Graduation date" type="month" value={eduForm.graduation_date?.slice(0, 7) || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEduForm({ ...eduForm, graduation_date: e.target.value + '-01' })} />
+            <Input label="GPA (optional)" value={eduForm.gpa || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEduForm({ ...eduForm, gpa: e.target.value })} placeholder="3.8" />
           </div>
           <div className="flex justify-end gap-2 mt-6">
             <Button variant="ghost" onClick={() => setEditSection(null)}>Cancel</Button>
@@ -433,16 +465,16 @@ export default function MasterProfilePage() {
         {/* Edit Project Modal */}
         <Modal open={editSection === 'project'} onClose={() => setEditSection(null)} title={projForm.id ? 'Edit project' : 'Add project'} size="lg">
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Project title" value={projForm.title || ''} onChange={e => setProjForm({ ...projForm, title: e.target.value })} required />
-            <Select label="Type" value={projForm.project_type || 'personal'} onChange={e => setProjForm({ ...projForm, project_type: e.target.value })}
+            <Input label="Project title" value={projForm.title || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjForm({ ...projForm, title: e.target.value })} required />
+            <Select label="Type" value={projForm.project_type || 'personal'} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setProjForm({ ...projForm, project_type: e.target.value })}
               options={[{ value: 'university', label: 'University' }, { value: 'personal', label: 'Personal' }, { value: 'team', label: 'Team' }, { value: 'professional', label: 'Professional' }]} />
             <div className="col-span-2">
-              <Textarea label="Description" value={projForm.description || ''} rows={2} onChange={e => setProjForm({ ...projForm, description: e.target.value })} />
+              <Textarea label="Description" value={projForm.description || ''} rows={2} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setProjForm({ ...projForm, description: e.target.value })} />
             </div>
-            <Input label="Technologies (comma separated)" value={projForm.technologies || ''} onChange={e => setProjForm({ ...projForm, technologies: e.target.value })} />
-            <Input label="GitHub link (optional)" value={projForm.github_link || ''} onChange={e => setProjForm({ ...projForm, github_link: e.target.value })} />
-            <Input label="Your contributions" value={projForm.contributions || ''} onChange={e => setProjForm({ ...projForm, contributions: e.target.value })} />
-            <Input label="Results / Impact" value={projForm.results || ''} onChange={e => setProjForm({ ...projForm, results: e.target.value })} />
+            <Input label="Technologies (comma separated)" value={projForm.technologies || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjForm({ ...projForm, technologies: e.target.value })} />
+            <Input label="GitHub link (optional)" value={projForm.github_link || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjForm({ ...projForm, github_link: e.target.value })} />
+            <Input label="Your contributions" value={projForm.contributions || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjForm({ ...projForm, contributions: e.target.value })} />
+            <Input label="Results / Impact" value={projForm.results || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjForm({ ...projForm, results: e.target.value })} />
           </div>
           <div className="flex justify-end gap-2 mt-6">
             <Button variant="ghost" onClick={() => setEditSection(null)}>Cancel</Button>
@@ -464,8 +496,8 @@ export default function MasterProfilePage() {
             <div className="flex gap-2">
               <div className="flex-1">
                 <Input placeholder="Type a skill and press Enter..." value={skillInput}
-                  onChange={e => setSkillInput(e.target.value)}
-                  onKeyDown={e => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSkillInput(e.target.value)}
+                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                     if (e.key === 'Enter' && skillInput.trim()) {
                       e.preventDefault();
                       const currentSkills = profile?.skills?.map((s: any) => s.skill_name) || [];

@@ -81,12 +81,6 @@ export async function POST(request: Request) {
                 needs_verification: needsVerification,
                 email,
             },
-        }, {
-            headers: {
-                'X-RateLimit-Limit': '5',
-                'X-RateLimit-Remaining': '4',
-                'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 900),
-            },
         });
     } catch (err) {
         console.error('Signup error:', err);
