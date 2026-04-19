@@ -48,8 +48,12 @@ export function useAddContact() {
 export function useGenerateMessage() {
   return useMutation({
     mutationFn: async (data: {
-      contact_name: string; contact_title: string;
-      company: string; role: string; tone: string;
+      contact_id: string;
+      contact_name: string;
+      contact_title: string;
+      company: string;
+      role: string;
+      tone: string;
     }) => {
       return fetchAPI('/network', {
         method: 'POST',
