@@ -665,27 +665,19 @@ CREATE TRIGGER on_auth_user_created
 
 -- Get or create current week usage row
 CREATE OR REPLACE FUNCTION get_weekly_usage(p_user_id UUID)
-RETURNS public.weekly_usage AS $$
+RETURNS SETOF public.weekly_usage AS $$
 DECLARE
   v_week_start DATE := DATE_TRUNC('week', NOW())::DATE;
-  v_usage public.weekly_usage;
 BEGIN
-  SELECT * INTO v_usage FROM public.weekly_usage
-  WHERE user_id = p_user_id AND week_start = v_week_start;
+  INSERT INTO public.weekly_usage (user_id, week_start)
+  VALUES (p_user_id, v_week_start)
+  ON CONFLICT (user_id, week_start) DO NOTHING;
 
-  IF NOT FOUND THEN
-    INSERT INTO public.weekly_usage (user_id, week_start)
-    VALUES (p_user_id, v_week_start)
-    ON CONFLICT (user_id, week_start) DO NOTHING
-    RETURNING * INTO v_usage;
-
-    IF v_usage IS NULL THEN
-      SELECT * INTO v_usage FROM public.weekly_usage
-      WHERE user_id = p_user_id AND week_start = v_week_start;
-    END IF;
-  END IF;
-
-  RETURN v_usage;
+  RETURN QUERY
+  SELECT *
+  FROM public.weekly_usage
+  WHERE user_id = p_user_id
+    AND week_start = v_week_start;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
