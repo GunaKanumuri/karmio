@@ -20,11 +20,11 @@ function TailoredResumeContent() {
   useEffect(() => {
     if (!jobId) return;
 
-    fetch(`/api/jobs?id=${jobId}`)
+    fetch(`/api/jobs/${jobId}`)
       .then(res => res.json())
       .then(json => {
-        if (json.success && json.data?.[0]) {
-          setJob(json.data[0]);
+        if (json.success && json.data) {
+          setJob(json.data);
         }
       });
   }, [jobId]);
@@ -57,8 +57,29 @@ function TailoredResumeContent() {
   };
 
   const handleDownload = async (format: 'pdf' | 'docx') => {
-    // For now, show the content - in production, this would download the file
-    alert(`Download ${format.toUpperCase()} feature coming soon! For now, you can copy the content below.`);
+    const recipeId = result?.recipe_id;
+    if (!recipeId) {
+      // No saved recipe yet — generate first
+      return;
+    }
+    try {
+      const res = await fetch(`/api/resumes/${recipeId}/download?format=${format}`);
+      if (!res.ok) {
+        console.error('Download failed:', res.status);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `resume-${job?.company_name?.toLowerCase().replace(/\s+/g, '-') || 'karmio'}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      console.error('Download error');
+    }
   };
 
   if (!jobId) {
@@ -218,7 +239,9 @@ function TailoredResumeContent() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleDownload('pdf')}
-                      className="btn btn-secondary btn-sm"
+                      disabled={!result?.recipe_id}
+                      title={!result?.recipe_id ? 'Generate resume first' : 'Download PDF'}
+                      className="btn btn-secondary btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
@@ -227,7 +250,9 @@ function TailoredResumeContent() {
                     </button>
                     <button
                       onClick={() => handleDownload('docx')}
-                      className="btn btn-secondary btn-sm"
+                      disabled={!result?.recipe_id}
+                      title={!result?.recipe_id ? 'Generate resume first' : 'Download DOCX'}
+                      className="btn btn-secondary btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />

@@ -142,21 +142,30 @@ export async function POST(req: NextRequest) {
 
     // Save resume recipe to database
     if (result.success && action !== 'cover_letter' && 'enhanced_summary' in result.data) {
-      await supabase.from('resume_recipes').insert({
-        user_id: user.id,
-        job_id: job_id,
-        enhanced_summary: result.data.enhanced_summary,
-        enhanced_bullets: result.data.enhanced_bullets,
-        keywords_matched: result.data.keywords_matched,
-        keywords_missing: result.data.keywords_missing,
-        match_score: result.data.match_score,
-        cover_letter_text: result.data.cover_letter_text,
-      });
+      const { data: savedRecipe } = await supabase
+        .from('resume_recipes')
+        .insert({
+          user_id: user.id,
+          job_id: job_id,
+          enhanced_summary: result.data.enhanced_summary,
+          enhanced_bullets: result.data.enhanced_bullets,
+          keywords_matched: result.data.keywords_matched,
+          keywords_missing: result.data.keywords_missing,
+          match_score: result.data.match_score,
+          cover_letter_text: result.data.cover_letter_text,
+        })
+        .select('id')
+        .single();
+
+      // Attach recipe_id to response so the client can trigger downloads
+      if (savedRecipe?.id) {
+        result = { ...result, data: { ...result.data, recipe_id: savedRecipe.id } };
+      }
 
       // Increment usage
-      await supabase.rpc('increment_usage', { 
-        p_user_id: user.id, 
-        p_field: 'resumes_generated' 
+      await supabase.rpc('increment_usage', {
+        p_user_id: user.id,
+        p_field: 'resumes_generated'
       });
     }
 
