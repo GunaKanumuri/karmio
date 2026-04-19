@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { checkTierAccess } from '@/lib/payments/tier-gate';
-import { generateInterviewPrep, PrepType } from '@/lib/ai/interview-prep';
+import { generateInterviewPrep, PrepStage as PrepType } from '@/lib/ai/interview-prep';
 import { SubscriptionTier } from '@/types';
 
 export async function POST(req: NextRequest) {

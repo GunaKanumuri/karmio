@@ -114,7 +114,7 @@ describe('Middleware routing logic', () => {
   it('redirects an incomplete-onboarding user away from /auth-pages/signup to /onboarding/location', () => {
     const user = { id: 'user-456' };
     const onboardingComplete = false;
-    const pathname = '/auth-pages/signup';
+    const pathname: string = '/auth-pages/signup';
 
     const isAuthPage =
       pathname === '/auth-pages/login' || pathname === '/auth-pages/signup';
@@ -127,7 +127,7 @@ describe('Middleware routing logic', () => {
   // ── Public routes ─────────────────────────────────────────────────────────
 
   it('passes through unauthenticated requests to the landing page', () => {
-    const pathname = '/';
+    const pathname: string = '/';
     const user = null;
 
     const isProtected =
