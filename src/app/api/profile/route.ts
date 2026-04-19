@@ -70,12 +70,27 @@ export async function PUT(req: NextRequest) {
       });
 
       if (Object.keys(filtered).length > 0) {
-        const { error } = await supabase.from('users').update(filtered).eq('id', user.id);
+        // Upsert: creates the row if the handle_new_user trigger didn't fire
+        // (e.g. user signed up before the schema was applied)
+        const upsertPayload = { id: user.id, email: user.email, ...filtered };
+        const { error } = await supabase
+          .from('users')
+          .upsert(upsertPayload, { onConflict: 'id' });
         if (error) {
           console.error('Profile update error:', error);
           return NextResponse.json({ success: false, error: { code: 'UPDATE_FAILED', message: 'Could not update profile.' } }, { status: 500 });
         }
+
+        // Bootstrap dependent rows in case they're also missing
+        await Promise.all([
+          supabase.from('user_settings').upsert({ user_id: user.id }, { onConflict: 'user_id' }),
+          supabase.from('weekly_usage').upsert(
+            { user_id: user.id, week_start: new Date(Date.now() - ((new Date().getDay() || 7) - 1) * 86400000).toISOString().slice(0, 10) },
+            { onConflict: 'user_id,week_start' }
+          ),
+        ]);
       }
+
     }
 
     // Upsert target profile
