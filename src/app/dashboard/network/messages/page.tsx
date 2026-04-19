@@ -54,7 +54,7 @@ export default function MessagesPage() {
 
   const tier = (user?.subscription_tier || 'free') as keyof typeof TIER_LIMITS;
   const limits = TIER_LIMITS[tier];
-  const canGenerate = limits.messages_per_week > 0;
+  const canGenerate = (limits.messages_per_week ?? 0) > 0;
 
   // Search / filter
   const [search, setSearch] = useState('');
