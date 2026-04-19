@@ -13,7 +13,7 @@ import { TIER_LIMITS } from '@/lib/constants';
 import { MessageTone } from '@/types';
 import {
   MessageSquare, Sparkles, Copy, Check, Search,
-  User, Briefcase, ExternalLink, RefreshCw,
+  User, ExternalLink,
 } from 'lucide-react';
 
 // ─── Tone config ──────────────────────────────────────────────────────────────

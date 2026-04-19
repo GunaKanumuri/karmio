@@ -22,9 +22,9 @@ export async function fetchSubscriptionStatus() {
 }
 
 export async function createCheckoutSession(plan: 'popular' | 'pro', billing: 'monthly' | 'yearly') {
-  return fetchAPI('/subscription/checkout', { method: 'POST', body: JSON.stringify({ plan, billing }) });
+  return fetchAPI('/payments', { method: 'POST', body: JSON.stringify({ action: 'checkout', plan, billing }) });
 }
 
 export async function cancelSubscription() {
-  return fetchAPI('/subscription/cancel', { method: 'POST' });
+  return fetchAPI('/payments', { method: 'DELETE' });
 }
