@@ -47,7 +47,7 @@ export default function SubscriptionPage() {
   const handleCancel = async () => {
     setCancelling(true);
     try {
-      const res = await fetchAPI<any>('/subscription/cancel', { method: 'POST' });
+      const res = await fetchAPI<any>('/payments', { method: 'DELETE' });
       if ((res as any).success) { showToast((res as any).data?.message || 'Subscription cancelled'); refreshUser(); setShowCancelModal(false); }
       else showToast((res as any).error?.message || 'Could not cancel subscription');
     } catch { showToast('Network error — please try again'); }

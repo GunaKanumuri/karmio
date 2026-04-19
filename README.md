@@ -11,7 +11,7 @@ Karmio replaces 5 job search tools with one intelligent platform — verified jo
 npm install
 
 # Set up environment (copy and fill in your keys)
-cp .env.example .env
+cp .env.example .env.local
 
 # Run development server
 npm run dev
@@ -104,15 +104,19 @@ karmio/
 # Public (exposed to browser)
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
+NEXT_PUBLIC_APP_URL=https://yourdomain.com
 
-# Private (server-only)
+# Private (server-only — never expose these)
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ANTHROPIC_API_KEY=sk-ant-...
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 RESEND_API_KEY=re_...
+CRON_SECRET=random-secret-string
+ADMIN_EMAILS=you@example.com
 ```
+
+See `.env.example` for the full list with descriptions.
 
 ## Scripts
 
@@ -122,9 +126,27 @@ RESEND_API_KEY=re_...
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
-| `npm run db:migrate` | Push DB migrations |
-| `npm run db:seed` | Seed database |
-| `npm run db:reset` | Reset database |
+| `npm test` | Run test suite (Vitest) |
+| `npm run test:watch` | Run tests in watch mode |
+| `npm run test:coverage` | Run tests with coverage report |
+| `npm run db:migrate` | Push DB migrations to Supabase |
+| `npm run db:seed` | Seed database with sample data |
+| `npm run db:reset` | Reset database (destructive) |
+
+## Deployment (Vercel)
+
+1. **Push to GitHub** and import the repo in [vercel.com/new](https://vercel.com/new)
+2. **Add all environment variables** from `.env.example` in Vercel → Settings → Environment Variables
+3. **Set up Stripe webhook** — in Stripe Dashboard, create a webhook pointing to:
+   `https://yourdomain.com/api/payments?webhook=true`
+   Events to listen for: `checkout.session.completed`, `customer.subscription.deleted`, `invoice.payment_failed`
+   Copy the webhook signing secret → `STRIPE_WEBHOOK_SECRET`
+4. **Cron job** runs automatically — `vercel.json` already schedules `/api/jobs/cron` every 2 hours.
+   Make sure `CRON_SECRET` is set so the endpoint is protected.
+5. **Run migrations** after first deploy:
+   ```bash
+   npm run db:migrate
+   ```
 
 ## Career Fields Supported
 

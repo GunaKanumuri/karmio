@@ -83,10 +83,10 @@ function Hero() {
 
 function TrustBar() {
   const stats = [
-    { value: '47K+', label: 'Active job seekers' },
-    { value: '2.3M', label: 'Jobs indexed' },
-    { value: '89%', label: 'Interview rate increase' },
-    { value: '4.9', label: 'App store rating' },
+    { value: '100+', label: 'Companies indexed' },
+    { value: 'Free', label: 'No credit card required' },
+    { value: 'US & IN', label: 'Markets supported' },
+    { value: '2026', label: 'Early access' },
   ];
 
   return (
